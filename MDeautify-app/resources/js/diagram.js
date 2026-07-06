@@ -63,7 +63,7 @@
       if (rel.label) parts.push(`<text x="${(x1 + x2) / 2}" y="${y + 14}" text-anchor="middle" fill="#64748b" font-family="${MONO}" font-size="8">${esc(rel.label)}</text>`);
     });
     const totalH = rowY + maxH + 20;
-    return `<svg viewBox="0 0 800 ${totalH}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}">${parts.join("")}</svg>`;
+    return `<svg viewBox="0 0 800 ${totalH}" width="800" height="${totalH}" xmlns="http://www.w3.org/2000/svg" font-family="${FONT}">${parts.join("")}</svg>`;
   }
 
   function parseEr(code) {
@@ -83,7 +83,7 @@
         }
         continue;
       }
-      const em = line.match(/^(\w+)\s*\{$/);
+      const em = line.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)\s*\{$/);
       if (em) { cur = { title: em[1], rows: [] }; entities.push(cur); index[em[1]] = entities.length - 1; continue; }
       const rm = line.match(relRe);
       if (rm) {
@@ -119,13 +119,13 @@
     function nodeTok(tok) {
       tok = tok.trim(); if (!tok) return null;
       let m;
-      if (m = tok.match(/^([A-Za-z0-9_]+)\(\[([\s\S]*)\]\)$/)) return ensure(m[1], cleanLabel(m[2]), "stadium");
-      if (m = tok.match(/^([A-Za-z0-9_]+)\(\(([\s\S]*)\)\)$/)) return ensure(m[1], cleanLabel(m[2]), "circle");
-      if (m = tok.match(/^([A-Za-z0-9_]+)\{([\s\S]*)\}$/)) return ensure(m[1], cleanLabel(m[2]), "diamond");
-      if (m = tok.match(/^([A-Za-z0-9_]+)\[([\s\S]*)\]$/)) return ensure(m[1], cleanLabel(m[2]), "rect");
-      if (m = tok.match(/^([A-Za-z0-9_]+)\(([\s\S]*)\)$/)) return ensure(m[1], cleanLabel(m[2]), "round");
-      if (m = tok.match(/^([A-Za-z0-9_]+)$/)) return ensure(m[1], null, "rect");
-      const mm = tok.match(/^([A-Za-z0-9_]+)/);
+      if (m = tok.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)\(\[([\s\S]*)\]\)$/)) return ensure(m[1], cleanLabel(m[2]), "stadium");
+      if (m = tok.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)\(\(([\s\S]*)\)\)$/)) return ensure(m[1], cleanLabel(m[2]), "circle");
+      if (m = tok.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)\{([\s\S]*)\}$/)) return ensure(m[1], cleanLabel(m[2]), "diamond");
+      if (m = tok.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)\[([\s\S]*)\]$/)) return ensure(m[1], cleanLabel(m[2]), "rect");
+      if (m = tok.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)\(([\s\S]*)\)$/)) return ensure(m[1], cleanLabel(m[2]), "round");
+      if (m = tok.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)$/)) return ensure(m[1], null, "rect");
+      const mm = tok.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)/);
       return mm ? ensure(mm[1], null, "rect") : null;
     }
     for (let line of raw) {
@@ -193,7 +193,7 @@
       let w = Math.max.apply(null, lines.map(l => textW(l, fs))) + 40;
       let h = Math.max(42, 18 + lines.length * 18);
       if (nd.shape === "diamond") { w += 40; h += 16; }
-      size[id] = { w: Math.max(84, Math.ceil(w)), h: Math.ceil(h) };
+      size[id] = { w: Math.max(130, Math.ceil(w)), h: Math.ceil(h) };
     });
     const rank = computeRanks(order, edges);
     const byRank = {};
@@ -255,7 +255,7 @@
     });
     // 노드
     order.forEach((id, idx) => { const p = pos[id]; if (p) drawNode(parts, parsed.nodes[id], p, FLOW_PALETTE[idx % FLOW_PALETTE.length]); });
-    return `<svg viewBox="0 0 ${Math.ceil(W)} ${Math.ceil(H)}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+    return `<svg viewBox="0 0 ${Math.ceil(W)} ${Math.ceil(H)}" width="${Math.ceil(W)}" height="${Math.ceil(H)}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
   }
   function labelChip(parts, x, y, text) {
     const w = textW(text, 10) + 8;
@@ -293,7 +293,7 @@
         parts.push(`<text x="${(xa + xb) / 2}" y="${y - 5}" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="10.5">${esc(m.label)}</text>`);
       }
     });
-    return `<svg viewBox="0 0 800 ${bottom + 8}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+    return `<svg viewBox="0 0 800 ${bottom + 8}" width="800" height="${bottom + 8}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
   }
 
   function parseSeq(code) {
@@ -301,9 +301,9 @@
     const ids = []; const names = {}; const index = {};
     const msgs = [];
     for (const line of raw) {
-      let m = line.match(/^participant\s+([A-Za-z0-9_]+)(?:\s+as\s+(.+))?$/i);
+      let m = line.match(/^participant\s+([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)(?:\s+as\s+(.+))?$/i);
       if (m) { const id = m[1]; if (!(id in index)) { index[id] = ids.length; ids.push(id); } names[id] = m[2] ? m[2].trim() : id; continue; }
-      m = line.match(/^([A-Za-z0-9_]+)\s*(-{1,2}>>?|-{1,2}x|-{1,2}\))\s*([A-Za-z0-9_]+)\s*:\s*(.+)$/);
+      m = line.match(/^([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)\s*(-{1,2}>>?|-{1,2}x|-{1,2}\))\s*([\w가-힣ㄱ-ㅎㅏ-ㅣ]+)\s*:\s*(.+)$/);
       if (m) {
         const from = m[1], arrow = m[2], to = m[3], label = m[4].trim();
         [from, to].forEach(id => { if (!(id in index)) { index[id] = ids.length; ids.push(id); names[id] = names[id] || id; } });
