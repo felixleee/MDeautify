@@ -6,6 +6,7 @@
   "port": 52102,
   "documentRoot": "/resources/",
   "url": "/",
+  "dataLocation": "system",
   "enableServer": true,
   "enableNativeAPI": true,
   "tokenSecurity": "one-time",
