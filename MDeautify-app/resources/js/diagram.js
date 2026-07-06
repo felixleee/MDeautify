@@ -195,6 +195,10 @@
       if (nd.shape === "diamond") { w += 40; h += 16; }
       size[id] = { w: Math.max(130, Math.ceil(w)), h: Math.ceil(h) };
     });
+    // 박스 크기 균일화: 한 다이어그램 내 모든 노드를 최대 폭·높이로 통일(정돈된 그리드)
+    let uw = 0, uh = 0;
+    order.forEach(id => { uw = Math.max(uw, size[id].w); uh = Math.max(uh, size[id].h); });
+    order.forEach(id => { size[id] = { w: uw, h: uh }; });
     const rank = computeRanks(order, edges);
     const byRank = {};
     order.forEach(id => { (byRank[rank[id]] = byRank[rank[id]] || []).push(id); });
