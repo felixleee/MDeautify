@@ -3,7 +3,7 @@
 마크다운(`.md`) 문서를 페이지 단위로 정돈된 **깔끔한 PDF**로 바꿔 주는 오프라인 도구입니다.
 
 - **오프라인 100%** — 인터넷 없이 동작합니다. 마크다운 파싱·변환 엔진이 전부 파일 안에 들어 있습니다.
-- **설치 불필요** — 단일 HTML 파일 하나(또는 실행 파일 `MDeautify.exe`) 하나로 끝납니다.
+- **설치 불필요** — 단일 HTML 파일 하나, 또는 단일 실행 파일 `MDeautify.exe` 하나로 끝납니다.
 - **왼쪽 원본 / 오른쪽 미리보기** — 마크다운 원문과 실제 PDF 모양을 나란히 봅니다.
 - **테마·글꼴·바닥글** — 클릭 몇 번으로 스타일을 바꿉니다.
 - **다이어그램 지원** — Mermaid(flowchart, erDiagram, sequenceDiagram 등)를 렌더된 그래픽으로 PDF에 담습니다.
@@ -12,7 +12,7 @@
 
 | 경로 | 설명 |
 |------|------|
-| `MDeautify.exe` | 실행 파일 (배포용). Neutralino로 감싼 Windows 앱 |
+| `MDeautify.exe` | 배포용 Windows 앱(단일 파일). Neutralino가 리소스를 exe에 내장(`--embed-resources`)해 `resources.neu` 없이 단독 실행됨 (`build.ps1 -Exe`가 자동 생성) |
 | `MDeautify-app/resources/` | **도구 본체(소스).** 모듈로 분리됨: `css/`, `fonts/`, `vendor/`(marked·Paged.js), `js/`(diagram·app·settings) |
 | `build/`, `build.ps1` | 배포 빌드 스크립트 (아래 참고) |
 | `MDeautify_사용안내서.md` / `.pdf` | 사용 안내서(마크다운 원본 + 이 도구로 생성한 PDF 예시) |
@@ -32,13 +32,14 @@
 배포본은 `build.ps1`로 생성하며 결과물은 `release/`에 모입니다:
 
 ```powershell
-.\build.ps1          # 단일 HTML + exe 둘 다
+.\build.ps1          # 단일 HTML + 단일 exe 둘 다
 .\build.ps1 -Html    # 단일 HTML만 (release\MDeautify.html) — 폰트·라이브러리까지 인라인된 자립 파일
-.\build.ps1 -Exe     # exe만 (release\MDeautify.exe) — Neutralino 빌드
+.\build.ps1 -Exe     # 단일 exe만 (release\MDeautify.exe)
 ```
 
-- **단일 HTML**: `build/inline.mjs`가 분리된 소스를 하나로 합칩니다(폰트는 base64로 재삽입). 브라우저로 바로 여는 배포용.
-- **exe**: `npx @neutralinojs/neu build`로 빌드 후 Windows exe를 복사합니다. (Node.js 필요)
+- **단일 HTML**: `build/inline.mjs`가 분리된 소스를 하나로 합칩니다(폰트는 base64로 재삽입). 브라우저로 바로 여는 배포용 자립 파일.
+- **단일 exe**: `npx @neutralinojs/neu build --embed-resources`로 리소스를 exe에 내장해 **단일 `MDeautify.exe`** 를 만듭니다(`resources.neu` 파일 불필요, exe 하나만 배포). (Node.js 필요)
+  - 참고: Neutralino 창 앱 특성상 실행하면 창 위치 저장용 `.tmp\`와 `neutralinojs.log`가 exe 옆에 생길 수 있습니다(무해).
 
 ## 라이선스
 

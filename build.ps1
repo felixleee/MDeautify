@@ -29,17 +29,19 @@ if ($doHtml) {
 }
 
 if ($doExe) {
-  Write-Host "== exe 빌드 (Neutralino) ==" -ForegroundColor Cyan
+  # ★ Neutralino 네이티브 --embed-resources 로 resources.neu 를 exe 안에 내장 →
+  #   '단일 파일' MDeautify.exe (별도 resources.neu 불필요). 외부 도구 없음.
+  Write-Host "== 단일 exe 빌드 (Neutralino --embed-resources) ==" -ForegroundColor Cyan
   Push-Location $appDir
   try {
-    npx --yes @neutralinojs/neu build
+    npx --yes @neutralinojs/neu build --embed-resources
   } finally {
     Pop-Location
   }
   $built = Join-Path $appDir "dist\MDeautify-app\MDeautify-app-win_x64.exe"
   if (-not (Test-Path $built)) { throw "빌드 산출물을 찾을 수 없음: $built" }
   Copy-Item $built (Join-Path $release "MDeautify.exe") -Force
-  Write-Host "[EXE] release\MDeautify.exe 생성" -ForegroundColor Green
+  Write-Host "[EXE] release\MDeautify.exe (단일 파일, 리소스 내장) 생성" -ForegroundColor Green
 }
 
 Write-Host ""
