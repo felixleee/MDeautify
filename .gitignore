@@ -1,4 +1,5 @@
-# ── 빌드/플랫폼 바이너리 (용량 큼, 재생성 가능) ──
+# ── 빌드 산출물 ──
+/release/
 MDeautify-app/bin/
 MDeautify-app/dist/
 
