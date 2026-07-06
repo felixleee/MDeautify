@@ -107,7 +107,7 @@ if(!marked.__delFix){marked.__delFix=1;marked.use({tokenizer:{del(src){var m=/^~
 var src=document.getElementById("src");
 src.innerHTML=buildCover(meta)+"<div class='content'>"+marked.parse(srcmd)+"</div>";
 src.querySelectorAll(".content h2, .content h3").forEach(function(h){var m=h.innerHTML.match(/^([A-Z])[.)·]?\s+([\s\S]*)$/);if(m)h.innerHTML="<span class='sn'>"+m[1]+"</span>"+m[2];});
-src.querySelectorAll("code.language-mermaid").forEach(function(c){var pre=c.closest("pre")||c;var kind=window.DIAG?DIAG.detectKind(c.textContent):null;var fig=document.createElement("figure");if(kind){fig.innerHTML=DIAG.render(kind,c.textContent);}else{var pp=document.createElement("pre");pp.textContent=c.textContent;fig.appendChild(pp);}pre.replaceWith(fig);});
+src.querySelectorAll("code.language-mermaid").forEach(function(c){var pre=c.closest("pre")||c;var kind=window.DIAG?DIAG.detectKind(c.textContent):null;var fig=document.createElement("figure");if(kind){fig.innerHTML=DIAG.render(kind,c.textContent);}else{var type=(c.textContent.trim().split(/\s+/)[0]||"diagram");var box=document.createElement("div");box.className="diag-unsupported";var ti=document.createElement("div");ti.className="du-title";ti.textContent="지원하지 않는 다이어그램: "+type+" (지원: flowchart · erDiagram · sequenceDiagram)";var pp=document.createElement("pre");pp.textContent=c.textContent;box.appendChild(ti);box.appendChild(pp);fig.appendChild(box);}pre.replaceWith(fig);});
 /* 언어 지정 코드블록만 구문 강조(언어 없는 블록=예시는 단색 유지 → 예시/실제 구별됨). mermaid는 위에서 이미 처리됨 */
 src.querySelectorAll("pre code[class*='language-']").forEach(function(c){var mm=(c.className||"").match(/language-([\w#+.-]+)/);c.innerHTML=hlCode(c.textContent,mm?mm[1]:"");});
 var fixed={"상태":"6%","id":"7%","tier":"6%","심각도":"9%","담당":"8%"};

@@ -148,6 +148,27 @@ body.loaded #drop{display:none;}
 .content blockquote{background:#eff6ff;background:color-mix(in srgb, var(--accent) 9%, #fff);border-left:4px solid var(--accent);padding:8px 12px;border-radius:4px;margin:12px 0;color:var(--brand);}
 .content blockquote p{margin:0;}
 .content figure{margin:14px 0;text-align:center;} .content figure svg{max-width:100%;height:auto;}
+.content figure img{max-width:100%;height:auto;}
+.content figure figcaption{font-size:calc(var(--doc-size) * 0.82);color:#64748b;margin-top:6px;}
+/* 이미지: 페이지 폭 넘침 방지 */
+.content img{max-width:100%;height:auto;display:block;margin:12px auto;border-radius:4px;}
+/* h5, h6 (기존 h4 이하 스케일 이어서) */
+.content h5{font-size:calc(var(--doc-size) * 1.0);color:#334155;font-weight:700;margin:10px 0 5px;}
+.content h6{font-size:calc(var(--doc-size) * 0.95);color:#64748b;font-weight:700;margin:10px 0 5px;}
+/* 수평선 */
+.content hr{border:0;border-top:2px solid #e2e8f0;margin:20px 0;}
+/* 링크: 인쇄에서도 강조색 유지 */
+.content a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;}
+/* 취소선 */
+.content del{color:#94a3b8;}
+/* GFM 체크박스 목록 */
+.content ul:has(input[type=checkbox]){list-style:none;padding-left:4px;}
+.content li:has(> input[type=checkbox]){list-style:none;}
+.content li input[type=checkbox]{margin:0 8px 0 0;transform:translateY(1px);accent-color:var(--accent);width:14px;height:14px;}
+/* 미지원 다이어그램 안내 박스 */
+.content figure .diag-unsupported{background:color-mix(in srgb, var(--accent) 6%, #fff);border:1px dashed var(--accent);border-radius:8px;padding:10px 14px;text-align:left;color:var(--brand);}
+.content figure .diag-unsupported .du-title{font-weight:700;font-size:calc(var(--doc-size) * 0.9);margin-bottom:6px;}
+.content figure .diag-unsupported pre{margin:0;font-size:calc(var(--doc-size) * 0.78);}
 /* print: WYSIWYG — 화면에 그려진 Paged.js 페이지를 그대로 인쇄 (미리보기와 100% 동일) */
 @page{size:A4;margin:0;}
 @media print{
