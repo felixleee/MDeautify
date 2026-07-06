@@ -294,8 +294,11 @@ sp.addEventListener("mousedown",function(e){if(e.target===fb||fb.contains(e.targ
 window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.getBoundingClientRect();var w=e.clientX-r.left;w=Math.max(180,Math.min(r.width-260,w));editor.style.flex="0 0 "+w+"px";lastBasis=w+"px";});
 window.addEventListener("mouseup",function(){if(dragging){dragging=false;document.body.style.userSelect="";document.body.style.cursor="";}});
 setIco();})();
-/* 브라우저 기본 파일열기 차단(전역). 실제 로드는 점선 박스 안에서만 유효 */
-["dragover","drop"].forEach(function(ev){document.addEventListener(ev,function(e){e.preventDefault();});});
+/* 브라우저 기본 파일열기 차단(전역) + 파일을 드롭하면 로드.
+   이미 문서가 열려 있으면(오버레이가 숨겨진 상태) 새 파일로 교체된다.
+   점선 박스 위 드롭은 아래 핸들러가 stopPropagation 하므로 중복 로드 없음. */
+document.addEventListener("dragover",function(e){e.preventDefault();});
+document.addEventListener("drop",function(e){e.preventDefault();var dt=e.dataTransfer;var f=dt&&dt.files&&dt.files[0];if(f)loadFile(f);});
 (function(){var box=document.querySelector(".drop-box");if(!box)return;
 ["dragenter","dragover"].forEach(function(ev){box.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();document.body.classList.add("drag");});});
 box.addEventListener("dragleave",function(e){if(!box.contains(e.relatedTarget))document.body.classList.remove("drag");});
