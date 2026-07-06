@@ -1,0 +1,9 @@
+/* MDeautify 로고 별 반짝임 애니메이션 (보존본 — 현재 미사용, 정적 로고 사용 중).
+   복원 방법: 아래 블록을 css/style.css 의 `.brand-mark{...}` 규칙 바로 뒤에 붙여넣으세요.
+   index.html 의 두 별 <path> 에는 이미 class='spark big' / class='spark small' 이 있어 그대로 동작합니다.
+   동작: 앱 로드 시 3회 반짝(큰별 → 0.3초 뒤 작은별, 각 ~0.9초) 후 정적으로 멈춤. */
+.brand-mark .spark{transform-box:fill-box;transform-origin:center;}
+.brand-mark .spark.big{animation:logoBigBlink 2s ease-in-out 3;}
+.brand-mark .spark.small{animation:logoSmallBlink 2s ease-in-out 3;}
+@keyframes logoBigBlink{0%,100%{opacity:1;transform:scale(1);}10%{opacity:.3;transform:scale(.6);}25%{opacity:1;transform:scale(1.35);}45%{opacity:1;transform:scale(1);}}
+@keyframes logoSmallBlink{0%,15%{opacity:.9;transform:scale(1);}25%{opacity:.3;transform:scale(.6);}40%{opacity:1;transform:scale(1.35);}60%{opacity:.9;transform:scale(1);}100%{opacity:.9;transform:scale(1);}}

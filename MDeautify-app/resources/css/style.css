@@ -9,13 +9,7 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #bar{flex:0 0 auto;display:flex;gap:10px;align-items:center;background:var(--ui-bar-bg);color:var(--ui-bar-fg);padding:10px 16px;box-shadow:0 2px 6px rgba(0,0,0,.18);z-index:5;}
 #bar .brand{font-size:17px;margin-right:12px;color:var(--ui-bar-fg);white-space:nowrap;display:inline-flex;align-items:center;gap:10px;}
 .brand-mark{flex:0 0 auto;display:block;}
-/* ===== 로고 별 반짝임 — 이 블록 전체를 지우면 정적(원래) 로고로 복귀 ===== */
-.brand-mark .spark{transform-box:fill-box;transform-origin:center;}
-.brand-mark .spark.big{animation:logoBigBlink 2s ease-in-out 3;}
-.brand-mark .spark.small{animation:logoSmallBlink 2s ease-in-out 3;}
-@keyframes logoBigBlink{0%,100%{opacity:1;transform:scale(1);}10%{opacity:.3;transform:scale(.6);}25%{opacity:1;transform:scale(1.35);}45%{opacity:1;transform:scale(1);}}
-@keyframes logoSmallBlink{0%,15%{opacity:.9;transform:scale(1);}25%{opacity:.3;transform:scale(.6);}40%{opacity:1;transform:scale(1.35);}60%{opacity:.9;transform:scale(1);}100%{opacity:.9;transform:scale(1);}}
-/* ===== /로고 별 반짝임 ===== */
+/* 로고는 정적. 별 반짝임 애니메이션 보존본: assets/logo-twinkle-animation.css (복원 시 이 자리에 붙여넣기) */
 .mode-sw{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ui-bar-fg);cursor:pointer;white-space:nowrap;margin-left:2px;}
 #bar .brand b{color:var(--ui-bar-fg);font-weight:800;letter-spacing:.3px;}
 .brand .brand-lock{display:inline-flex;flex-direction:column;line-height:1.05;margin-top:6px;}
