@@ -12,19 +12,15 @@
 
 | 경로 | 설명 |
 |------|------|
-| `MDeautify_Season3.5.html` | 핵심 도구. 브라우저에서 바로 열어 사용하는 단일 HTML 파일 |
-| `MDeautify.exe` | Neutralino로 감싼 Windows 실행 파일 |
-| `MDeautify-app/` | Neutralino 앱 소스(리소스·설정). `bin/`·`dist/`는 빌드 산출물이라 저장소에서 제외 |
+| `MDeautify.exe` | 실행 파일 (배포용). Neutralino로 감싼 Windows 앱 |
+| `MDeautify-app/` | Neutralino 앱 소스. **도구 본체는 `resources/index.html`에 있으며 여기서 exe를 빌드**합니다. `bin/`·`dist/`는 빌드 산출물이라 저장소에서 제외 |
 | `MDeautify_사용안내서.md` / `.pdf` | 사용 안내서(마크다운 원본 + 이 도구로 생성한 PDF 예시) |
-| `MDeautify 실행.bat` | 실행 도우미 배치 파일 |
 
 ## 사용법
 
-### 1) HTML로 바로 쓰기
-`MDeautify_Season3.5.html`을 브라우저에서 열고, 왼쪽 영역에 `.md` 파일을 끌어다 놓거나 내용을 붙여넣습니다. `PDF 저장/인쇄` 버튼 → 대상을 **PDF로 저장** 선택.
+`MDeautify.exe`를 실행하고, 왼쪽 영역에 `.md` 파일을 끌어다 놓거나 내용을 붙여넣습니다. `PDF 저장/인쇄` 버튼 → 대상을 **PDF로 저장** 선택.
 
-### 2) 실행 파일로 쓰기
-`MDeautify.exe`를 실행합니다.
+> 브라우저만으로 쓰려면 `MDeautify-app/resources/index.html`을 열어도 동일하게 동작합니다.
 
 자세한 내용은 [사용 안내서](MDeautify_사용안내서.pdf)를 참고하세요.
 
