@@ -9,6 +9,13 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #bar{flex:0 0 auto;display:flex;gap:10px;align-items:center;background:var(--ui-bar-bg);color:var(--ui-bar-fg);padding:10px 16px;box-shadow:0 2px 6px rgba(0,0,0,.18);z-index:5;}
 #bar .brand{font-size:17px;margin-right:12px;color:var(--ui-bar-fg);white-space:nowrap;display:inline-flex;align-items:center;gap:10px;}
 .brand-mark{flex:0 0 auto;display:block;}
+/* ===== 로고 별 반짝임 — 이 블록 전체를 지우면 정적(원래) 로고로 복귀 ===== */
+.brand-mark .spark{transform-box:fill-box;transform-origin:center;}
+.brand-mark .spark.big{animation:logoBigTw 5s ease-in-out infinite;}
+.brand-mark .spark.small{animation:logoSmallTw 5s ease-in-out infinite;}
+@keyframes logoBigTw{0%{opacity:.2;transform:scale(.7);}9%{opacity:1;transform:scale(1.3);}18%{opacity:.2;transform:scale(.7);}100%{opacity:.2;transform:scale(.7);}}
+@keyframes logoSmallTw{0%,6%{opacity:.2;transform:scale(.7);}15%{opacity:1;transform:scale(1.3);}24%{opacity:.2;transform:scale(.7);}100%{opacity:.2;transform:scale(.7);}}
+/* ===== /로고 별 반짝임 ===== */
 .mode-sw{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ui-bar-fg);cursor:pointer;white-space:nowrap;margin-left:2px;}
 #bar .brand b{color:var(--ui-bar-fg);font-weight:800;letter-spacing:.3px;}
 .brand .brand-lock{display:inline-flex;flex-direction:column;line-height:1.05;margin-top:6px;}

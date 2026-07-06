@@ -1,0 +1,9 @@
+<!-- MDeautify 원본 정적 로고(반짝임 도입 전 보존본).
+     되돌리는 법: (1) css/style.css 의 "로고 별 반짝임" 블록 삭제,
+     또는 (2) index.html 의 brand-mark <svg> 를 아래 마크업으로 교체(별 path의 class 제거). -->
+<svg class='brand-mark' width='30' height='30' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg' aria-hidden='true'>
+  <rect x='1' y='1' width='46' height='46' rx='12' fill='#7c3aed'/>
+  <path d='M10 33 V18 L20 28 L30 18 V33' fill='none' stroke='#fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>
+  <path d='M36.5 8 C36.5 12.8 38.7 15 43.5 15 C38.7 15 36.5 17.2 36.5 22 C36.5 17.2 34.3 15 29.5 15 C34.3 15 36.5 12.8 36.5 8 Z' fill='#fff'/>
+  <path d='M40 20 C40 24 41 25 45 25 C41 25 40 26 40 30 C40 26 39 25 35 25 C39 25 40 24 40 20 Z' fill='#fff' opacity='0.9'/>
+</svg>
