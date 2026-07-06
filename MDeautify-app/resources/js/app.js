@@ -100,7 +100,8 @@ function hlCode(src, lang){
 }
 function buildSource(text){
 var fm=parseFrontmatter(text),meta=fm.meta;var srcmd=fixLooseLists(fm.body);
-var title=meta.title||meta["제목"]||"";if(title)srcmd=srcmd.replace(/^\s*#\s+.*\n/,"");
+/* 표지 제목과 '동일한' 본문 첫 H1만 중복으로 보고 제거(내용이 다른 H1은 그대로 살림) */
+var title=meta.title||meta["제목"]||"";if(title)srcmd=srcmd.replace(/^\s*#\s+(.*)\r?\n/,function(m,h){return h.trim()===title.trim()?"":m;});
 marked.setOptions({gfm:true,breaks:false});
 /* 삭선은 겹물결(~~)일 때만. 홑물결(~)은 범위표기(예:166~169)로 보고 그대로 둠 */
 if(!marked.__delFix){marked.__delFix=1;marked.use({tokenizer:{del(src){var m=/^~~(?=\S)([\s\S]*?\S)~~/.exec(src);if(m){return {type:"del",raw:m[0],text:m[1],tokens:this.lexer.inlineTokens(m[1])};}if(src.charCodeAt(0)===126){return {type:"text",raw:"~",text:"~"};}return false;}}});}
@@ -108,7 +109,7 @@ var src=document.getElementById("src");
 src.innerHTML=buildCover(meta)+"<div class='content'>"+marked.parse(srcmd)+"</div>";
 /* 링크는 새 탭/새 창으로 열기 */
 src.querySelectorAll(".content a[href]").forEach(function(a){a.setAttribute("target","_blank");a.setAttribute("rel","noopener noreferrer");});
-src.querySelectorAll(".content h2, .content h3").forEach(function(h){var m=h.innerHTML.match(/^([A-Z])[.)·]?\s+([\s\S]*)$/);if(m)h.innerHTML="<span class='sn'>"+m[1]+"</span>"+m[2];});
+src.querySelectorAll(".content h1, .content h2, .content h3").forEach(function(h){var m=h.innerHTML.match(/^([A-Z])[.)·]?\s+([\s\S]*)$/);if(m)h.innerHTML="<span class='sn'>"+m[1]+"</span>"+m[2];});
 src.querySelectorAll("code.language-mermaid").forEach(function(c){var pre=c.closest("pre")||c;var kind=window.DIAG?DIAG.detectKind(c.textContent):null;var fig=document.createElement("figure");if(kind){fig.innerHTML=DIAG.render(kind,c.textContent);}else{var type=(c.textContent.trim().split(/\s+/)[0]||"diagram");var box=document.createElement("div");box.className="diag-unsupported";var ti=document.createElement("div");ti.className="du-title";ti.textContent="지원하지 않는 다이어그램: "+type+" (지원: flowchart · erDiagram · sequenceDiagram)";var pp=document.createElement("pre");pp.textContent=c.textContent;box.appendChild(ti);box.appendChild(pp);fig.appendChild(box);}pre.replaceWith(fig);});
 /* 언어 지정 코드블록만 구문 강조(언어 없는 블록=예시는 단색 유지 → 예시/실제 구별됨). mermaid는 위에서 이미 처리됨 */
 src.querySelectorAll("pre code[class*='language-']").forEach(function(c){var mm=(c.className||"").match(/language-([\w#+.-]+)/);c.innerHTML=hlCode(c.textContent,mm?mm[1]:"");});
