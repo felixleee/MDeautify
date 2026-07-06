@@ -17,6 +17,26 @@
     for (const ch of String(s)) w += /[ᄀ-ᇿ　-〿㄰-㆏가-힣＀-￯]/.test(ch) ? fs : fs * 0.55;
     return w;
   }
+  // 긴 라벨 줄을 maxw 폭에 맞춰 여러 줄로 자동 줄바꿈(공백 우선, 한글 등은 문자 단위)
+  function wrapLine(s, maxw, fs) {
+    s = String(s);
+    if (textW(s, fs) <= maxw) return [s];
+    const lines = []; let cur = "";
+    const flush = () => { if (cur.trim()) lines.push(cur.trim()); cur = ""; };
+    for (const p of s.split(/(\s+)/)) {
+      if (textW(cur + p, fs) <= maxw) { cur += p; continue; }
+      if (cur.trim()) flush();
+      if (textW(p, fs) <= maxw) { cur = p.replace(/^\s+/, ""); continue; }
+      let chunk = "";
+      for (const ch of p) {
+        if (textW(chunk + ch, fs) <= maxw) chunk += ch;
+        else { if (chunk) lines.push(chunk); chunk = ch; }
+      }
+      cur = chunk;
+    }
+    flush();
+    return lines.length ? lines : [s];
+  }
   function stripQuotes(s) { return String(s).trim().replace(/^["']|["']$/g, "").trim(); }
 
   // ---------------- ERD ----------------
@@ -163,7 +183,7 @@
   }
 
   function drawNode(parts, nd, p, c) {
-    const lines = String(nd.label).split("\n");
+    const lines = nd._lines || String(nd.label).split("\n");
     const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
     if (nd.shape === "diamond") {
       parts.push(`<polygon points="${cx},${p.y} ${p.x + p.w},${cy} ${cx},${p.y + p.h} ${p.x},${cy}" fill="#fff" stroke="${c}" stroke-width="1.6"/>`);
@@ -185,11 +205,14 @@
     const { order, edges, dir } = parsed;
     if (!order.length) return `<svg viewBox="0 0 800 40" xmlns="http://www.w3.org/2000/svg"></svg>`;
     const horizontal = (dir === "LR" || dir === "RL");
-    const fs = 12;
+    const fs = 12, WRAPW = 300;
     const size = {};
     order.forEach(id => {
       const nd = parsed.nodes[id];
-      const lines = String(nd.label).split("\n");
+      let lines = [];
+      String(nd.label).split("\n").forEach(l => { lines = lines.concat(wrapLine(l, WRAPW, fs)); });
+      if (!lines.length) lines = [nd.id];
+      nd._lines = lines;
       let w = Math.max.apply(null, lines.map(l => textW(l, fs))) + 40;
       let h = Math.max(42, 18 + lines.length * 18);
       if (nd.shape === "diamond") { w += 40; h += 16; }

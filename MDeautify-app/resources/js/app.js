@@ -106,6 +106,8 @@ marked.setOptions({gfm:true,breaks:false});
 if(!marked.__delFix){marked.__delFix=1;marked.use({tokenizer:{del(src){var m=/^~~(?=\S)([\s\S]*?\S)~~/.exec(src);if(m){return {type:"del",raw:m[0],text:m[1],tokens:this.lexer.inlineTokens(m[1])};}if(src.charCodeAt(0)===126){return {type:"text",raw:"~",text:"~"};}return false;}}});}
 var src=document.getElementById("src");
 src.innerHTML=buildCover(meta)+"<div class='content'>"+marked.parse(srcmd)+"</div>";
+/* 링크는 새 탭/새 창으로 열기 */
+src.querySelectorAll(".content a[href]").forEach(function(a){a.setAttribute("target","_blank");a.setAttribute("rel","noopener noreferrer");});
 src.querySelectorAll(".content h2, .content h3").forEach(function(h){var m=h.innerHTML.match(/^([A-Z])[.)·]?\s+([\s\S]*)$/);if(m)h.innerHTML="<span class='sn'>"+m[1]+"</span>"+m[2];});
 src.querySelectorAll("code.language-mermaid").forEach(function(c){var pre=c.closest("pre")||c;var kind=window.DIAG?DIAG.detectKind(c.textContent):null;var fig=document.createElement("figure");if(kind){fig.innerHTML=DIAG.render(kind,c.textContent);}else{var type=(c.textContent.trim().split(/\s+/)[0]||"diagram");var box=document.createElement("div");box.className="diag-unsupported";var ti=document.createElement("div");ti.className="du-title";ti.textContent="지원하지 않는 다이어그램: "+type+" (지원: flowchart · erDiagram · sequenceDiagram)";var pp=document.createElement("pre");pp.textContent=c.textContent;box.appendChild(ti);box.appendChild(pp);fig.appendChild(box);}pre.replaceWith(fig);});
 /* 언어 지정 코드블록만 구문 강조(언어 없는 블록=예시는 단색 유지 → 예시/실제 구별됨). mermaid는 위에서 이미 처리됨 */
@@ -281,7 +283,8 @@ window.MD2R=(function(){var K="md2pdf_remember",regs=[];function on(){try{var v=
 })();
 
 document.getElementById("btnPrint").addEventListener("click",function(){if(!document.body.classList.contains("loaded")){alert("변환된 내용이 없습니다. 먼저 MD 파일을 불러오세요.");return;}window.print();});
-document.getElementById("btnReset").addEventListener("click",function(){document.body.classList.remove("loaded");var el;if(el=document.getElementById("pages"))el.innerHTML="";if(el=document.getElementById("raw"))el.innerHTML="";if(el=document.getElementById("src"))el.innerHTML="";if(el=document.getElementById("pvHead"))el.textContent="Total 0 pages";if(el=document.getElementById("fileInput"))el.value="";window.__lastText="";if(el=document.getElementById("viewer"))el.scrollTop=0;});
+/* 상단 'MD 파일 열기' — 파일 선택 창을 열어 다른 MD 파일 불러오기 */
+var _btnOpenTop=document.getElementById("btnOpenTop");if(_btnOpenTop)_btnOpenTop.addEventListener("click",function(){var fi=document.getElementById("fileInput");if(fi){fi.value="";fi.click();}});
 /* MD 원본/미리보기 리사이즈 핸들 + 가운데 접기/펼치기 */
 (function(){var main=document.getElementById("main"),editor=document.getElementById("editor"),sp=document.getElementById("splitter"),fb=document.getElementById("foldBtn");if(!main||!editor||!sp||!fb)return;var ico=fb.querySelector(".fold-ico"),lastBasis="42%",dragging=false;
 function setIco(){ico.textContent=document.body.classList.contains("editor-collapsed")?"›":"‹";}
