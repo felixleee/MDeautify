@@ -11,10 +11,10 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 .brand-mark{flex:0 0 auto;display:block;}
 /* ===== 로고 별 반짝임 — 이 블록 전체를 지우면 정적(원래) 로고로 복귀 ===== */
 .brand-mark .spark{transform-box:fill-box;transform-origin:center;}
-.brand-mark .spark.big{animation:logoBigTw 5s ease-in-out infinite;}
-.brand-mark .spark.small{animation:logoSmallTw 5s ease-in-out infinite;}
-@keyframes logoBigTw{0%{opacity:.2;transform:scale(.7);}9%{opacity:1;transform:scale(1.3);}18%{opacity:.2;transform:scale(.7);}100%{opacity:.2;transform:scale(.7);}}
-@keyframes logoSmallTw{0%,6%{opacity:.2;transform:scale(.7);}15%{opacity:1;transform:scale(1.3);}24%{opacity:.2;transform:scale(.7);}100%{opacity:.2;transform:scale(.7);}}
+.brand-mark .spark.big{animation:logoBigBlink 2s ease-in-out 3;}
+.brand-mark .spark.small{animation:logoSmallBlink 2s ease-in-out 3;}
+@keyframes logoBigBlink{0%,100%{opacity:1;transform:scale(1);}10%{opacity:.3;transform:scale(.6);}25%{opacity:1;transform:scale(1.35);}45%{opacity:1;transform:scale(1);}}
+@keyframes logoSmallBlink{0%,15%{opacity:.9;transform:scale(1);}25%{opacity:.3;transform:scale(.6);}40%{opacity:1;transform:scale(1.35);}60%{opacity:.9;transform:scale(1);}100%{opacity:.9;transform:scale(1);}}
 /* ===== /로고 별 반짝임 ===== */
 .mode-sw{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ui-bar-fg);cursor:pointer;white-space:nowrap;margin-left:2px;}
 #bar .brand b{color:var(--ui-bar-fg);font-weight:800;letter-spacing:.3px;}
