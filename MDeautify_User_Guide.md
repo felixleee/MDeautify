@@ -267,7 +267,7 @@ Author: John Doe
 ## F. Saving as a PDF
 
 1. Click the **`Save / Print PDF`** button at the top.
-2. When the print dialog opens, choose **`Save as PDF`** or **`Microsoft Print to PDF`** as the printer (destination).
+2. When the print dialog opens, choose **`Save as PDF`** as the destination. (**Avoid `Microsoft Print to PDF` — it drops hyperlinks.**)
 3. Click `Save`, choose a location, and you're done.
 
 *This document was created with MDeautify.*
