@@ -11,7 +11,7 @@
   "tokenSecurity": "one-time",
   "logging": {
     "enabled": true,
-    "writeToLogFile": true
+    "writeToLogFile": false
   },
   "nativeAllowList": [
     "app.*",
