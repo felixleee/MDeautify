@@ -32,21 +32,14 @@
 배포본은 `build.ps1`로 생성하며 결과물은 `release/`에 모입니다:
 
 ```powershell
-.\build.ps1           # 단일 HTML + 단일 exe + 배포 패키지 전부
-.\build.ps1 -Html     # 단일 HTML만 (release\MDeautify.html) — 폰트·라이브러리까지 인라인된 자립 파일
-.\build.ps1 -Exe      # 단일 exe만 (release\MDeautify.exe)
-.\build.ps1 -Package  # 배포 패키지 zip만 (exe 빌드 후 안내서와 함께 묶음)
+.\build.ps1          # 단일 HTML + 단일 exe 둘 다
+.\build.ps1 -Html    # 단일 HTML만 (release\MDeautify.html) — 폰트·라이브러리까지 인라인된 자립 파일
+.\build.ps1 -Exe     # 단일 exe만 (release\MDeautify.exe)
 ```
 
 - **단일 HTML**: `build/inline.mjs`가 분리된 소스를 하나로 합칩니다(폰트는 base64로 재삽입). 브라우저로 바로 여는 배포용 자립 파일.
 - **단일 exe**: `npx @neutralinojs/neu build --embed-resources`로 리소스를 exe에 내장해 **단일 `MDeautify.exe`** 를 만듭니다(`resources.neu` 파일 불필요, exe 하나만 배포). (Node.js 필요)
   - 참고: 창 위치 등 프레임워크 데이터는 `%APPDATA%\com.mdeautify.app\`에 저장되고(실행 로그는 끔), exe 실행 폴더는 깨끗하게 유지됩니다.
-- **배포 패키지**: `release\MDeautify-release.zip` 을 만듭니다. 압축을 풀면 아래 구조로, exe와 안내서(한/영, md·pdf)가 함께 들어 있습니다.
-  ```
-  MDeautify/
-  ├─ MDeautify.exe
-  └─ guides/   (MDeautify_사용안내서.md·pdf, MDeautify_User_Guide.md·pdf)
-  ```
 
 ## 라이선스
 
