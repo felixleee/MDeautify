@@ -3,9 +3,9 @@
 :root{--brand:#4c1d95;--accent:#7c3aed;--on-accent:#fff;--doc-font:"Noto Sans KR","Noto Sans CJK KR","Malgun Gothic","Segoe UI",sans-serif;--doc-size:14px;}
 .content{font-family:var(--doc-font);}
 html,body{height:100%;margin:0;}
-body{--ui-bar-bg:#eef2f7;--ui-bar-fg:#1f2937;--ui-brand-accent:#7c3aed;--ui-brand-sub:#64748b;--ui-btn:#7c3aed;--ui-btn-fg:#ffffff;--ui-editor-bg:#f8fafc;--ui-editor-fg:#334155;--ui-editor-border:#e2e8f0;--ui-viewer-bg:#e5e7eb;--ui-drop-bg:#f8fafc;--ui-drop-fg:#64748b;--ui-drop-h:#1f2937;--ui-drop-drag:#e9eef4;--ui-pvhead-bg:#eef2f6;--ui-pvhead-fg:#475569;--ui-pvhead-border:#d1d5db;--sx-h:#0550ae;--sx-q:#116329;--sx-l:#8250df;--sx-c:#a31515;--sx-b:#953800;--sx-lk:#0a7ea4;--tm-card:#ffffff;--tm-fg:#1f2937;--tm-fg2:#334155;--tm-muted:#64748b;--tm-close:#94a3b8;--tm-border:#e2e8f0;--tm-bhover:#cbd5e1;--tm-hover-bg:#f8fafc;--tm-switch-off:#cbd5e1;--tm-knob:#ffffff;--tm-ring:rgba(0,0,0,.12);}
-body.dark{--ui-bar-bg:#1f2937;--ui-bar-fg:#ffffff;--ui-brand-accent:#a78bfa;--ui-brand-sub:#94a3b8;--ui-editor-bg:#1e1e1e;--ui-editor-fg:#d4d4d4;--ui-editor-border:#0b0b0b;--ui-viewer-bg:#111827;--ui-drop-bg:#0f172a;--ui-drop-fg:#94a3b8;--ui-drop-h:#e2e8f0;--ui-drop-drag:#111827;--ui-pvhead-bg:#111827;--ui-pvhead-fg:#94a3b8;--ui-pvhead-border:#0b0b0b;--sx-h:#569cd6;--sx-q:#6a9955;--sx-l:#c586c0;--sx-c:#ce9178;--sx-b:#d7ba7d;--sx-lk:#4ec9b0;--tm-card:#28323f;--tm-fg:#f1f5f9;--tm-fg2:#cbd5e1;--tm-muted:#94a3b8;--tm-close:#94a3b8;--tm-border:#3a4657;--tm-bhover:#4b5a6e;--tm-hover-bg:#334155;--tm-switch-off:#475569;--tm-knob:#e5e7eb;--tm-ring:rgba(255,255,255,.20);}
-body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","Segoe UI",sans-serif;color:#1f2937;background:var(--ui-viewer-bg);display:flex;flex-direction:column;overflow:hidden;}
+body{--ui-bar-bg:#eef2f7;--ui-bar-fg:#1f2937;--ui-brand-accent:#7c3aed;--ui-brand-sub:#64748b;--ui-btn:#7c3aed;--ui-btn-fg:#ffffff;--ui-editor-bg:#f8fafc;--ui-editor-fg:#334155;--ui-editor-border:#e2e8f0;--ui-viewer-bg:#e5e7eb;--ui-drop-bg:#f8fafc;--ui-drop-fg:#64748b;--ui-drop-h:#1f2937;--ui-drop-drag:#e9eef4;--ui-pvhead-bg:#eef2f6;--ui-pvhead-fg:#475569;--ui-pvhead-border:#d1d5db;--sx-h:#0550ae;--sx-q:#116329;--sx-l:#8250df;--sx-c:#a31515;--sx-b:#953800;--sx-lk:#0a7ea4;--tm-card:#ffffff;--tm-fg:#1f2937;--tm-fg2:#334155;--tm-muted:#64748b;--tm-close:#94a3b8;--tm-border:#e2e8f0;--tm-bhover:#cbd5e1;--tm-hover-bg:#f8fafc;--tm-switch-off:#cbd5e1;--tm-knob:#ffffff;--tm-ring:rgba(0,0,0,.12);--sb-thumb:#b8c0cc;--sb-track:#eef2f6;}
+body.dark{--ui-bar-bg:#1f2937;--ui-bar-fg:#ffffff;--ui-brand-accent:#a78bfa;--ui-brand-sub:#94a3b8;--ui-editor-bg:#1e1e1e;--ui-editor-fg:#d4d4d4;--ui-editor-border:#0b0b0b;--ui-viewer-bg:#111827;--ui-drop-bg:#0f172a;--ui-drop-fg:#94a3b8;--ui-drop-h:#e2e8f0;--ui-drop-drag:#111827;--ui-pvhead-bg:#111827;--ui-pvhead-fg:#94a3b8;--ui-pvhead-border:#0b0b0b;--sx-h:#569cd6;--sx-q:#6a9955;--sx-l:#c586c0;--sx-c:#ce9178;--sx-b:#d7ba7d;--sx-lk:#4ec9b0;--tm-card:#28323f;--tm-fg:#f1f5f9;--tm-fg2:#cbd5e1;--tm-muted:#94a3b8;--tm-close:#94a3b8;--tm-border:#3a4657;--tm-bhover:#4b5a6e;--tm-hover-bg:#334155;--tm-switch-off:#475569;--tm-knob:#e5e7eb;--tm-ring:rgba(255,255,255,.20);--sb-thumb:#3f4b5b;--sb-track:#1a2230;}
+body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","Segoe UI",sans-serif;color:#1f2937;background:var(--ui-viewer-bg);display:flex;flex-direction:column;overflow:hidden;scrollbar-width:thin;scrollbar-color:var(--sb-thumb) var(--sb-track);}
 #bar{flex:0 0 auto;display:flex;gap:10px;align-items:center;background:var(--ui-bar-bg);color:var(--ui-bar-fg);padding:10px 16px;box-shadow:0 2px 6px rgba(0,0,0,.18);z-index:5;}
 #bar .brand{font-size:17px;margin-right:12px;color:var(--ui-bar-fg);white-space:nowrap;display:inline-flex;align-items:center;gap:10px;}
 .brand-mark{flex:0 0 auto;display:block;}
@@ -184,8 +184,11 @@ body.loaded #drop{display:none;}
   /* Paged.js 실제 페이지: 화면 전용 여백/그림자만 제거. 이미 최종 분할된 페이지이므로 재분할 규칙은 넣지 않음 */
   #pages .pagedjs_pages{display:block !important;}
   #pages .pagedjs_page{box-shadow:none !important;margin:0 !important;}
-  /* Paged.js .pagedjs_sheet 의 overflow:hidden 은 Chrome 인쇄 시 하이퍼링크(주석)를 잘라먹음 → 인쇄 때만 해제해 링크가 클릭되게 함 */
-  #pages .pagedjs_sheet{overflow:visible !important;}
+  /* Paged.js .pagedjs_sheet 의 overflow:hidden 은 Chrome 인쇄 시 하이퍼링크(주석)를 잘라먹음 → 세로는 풀어 링크를 살리되,
+     가로는 clip 유지: 분할 래퍼(split fragment)가 드물게 페이지 폭을 크게 초과하는 Paged.js 레이아웃 버그가 있어,
+     overflow:visible 로 완전히 풀면 그 초과분이 인쇄 폭에 반영돼 Chrome이 문서 전체를 축소(좌상단 몰림)시킴.
+     overflow-x:clip 은 clip 된 내용을 인쇄/스크롤 폭 계산에서 제외하면서 세로(visible)엔 영향 없음(하이퍼링크 유지). */
+  #pages .pagedjs_sheet{overflow:visible !important;overflow-x:clip !important;overflow-y:visible !important;}
   /* --- 아래 native 페이지네이션 규칙은 Paged.js 실패 시 fallback(연속 보기)에만 적용 --- */
   #pages .fallback-doc,#pages .paper{box-shadow:none !important;margin:0 auto !important;}
   #pages .fallback-doc .content thead,#pages .paper .content thead{display:table-header-group;}
