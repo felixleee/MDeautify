@@ -184,6 +184,8 @@ body.loaded #drop{display:none;}
   /* Paged.js 실제 페이지: 화면 전용 여백/그림자만 제거. 이미 최종 분할된 페이지이므로 재분할 규칙은 넣지 않음 */
   #pages .pagedjs_pages{display:block !important;}
   #pages .pagedjs_page{box-shadow:none !important;margin:0 !important;}
+  /* Paged.js .pagedjs_sheet 의 overflow:hidden 은 Chrome 인쇄 시 하이퍼링크(주석)를 잘라먹음 → 인쇄 때만 해제해 링크가 클릭되게 함 */
+  #pages .pagedjs_sheet{overflow:visible !important;}
   /* --- 아래 native 페이지네이션 규칙은 Paged.js 실패 시 fallback(연속 보기)에만 적용 --- */
   #pages .fallback-doc,#pages .paper{box-shadow:none !important;margin:0 auto !important;}
   #pages .fallback-doc .content thead,#pages .paper .content thead{display:table-header-group;}
