@@ -164,9 +164,14 @@ var head=document.getElementById("pvHead");
 try{var r=document.createElement("div");r.style.cssText="position:absolute;left:-9999px;width:100mm;height:10mm;";document.body.appendChild(r);var pxmm=r.offsetWidth/100;document.body.removeChild(r);var pc=(297-36)*pxmm;var n=(pc>0&&paper.scrollHeight>0)?Math.max(1,Math.ceil(paper.scrollHeight/pc)):0;if(head)head.textContent=n?("미리보기 · 약 "+n+"페이지 (저장/인쇄 시 자동 페이지 분할)"):"미리보기 (저장/인쇄 시 자동 페이지 분할)";}catch(e){if(head)head.textContent="미리보기";}
 document.getElementById("viewer").scrollTop=0;
 }
-function runPaged(src,pass){
-  var pages=document.getElementById("pages");pages.innerHTML="";
-  if(!window.PagedModule||!window.PagedModule.Previewer){fallbackRender(src);return;}
+function runPaged(src,keepScroll){
+  var pages=document.getElementById("pages");
+  var viewer=document.getElementById("viewer");
+  var vMax=viewer.scrollHeight-viewer.clientHeight;
+  var ratio=(keepScroll&&vMax>0)?viewer.scrollTop/vMax:0;
+  function restore(){var m=viewer.scrollHeight-viewer.clientHeight;viewer.scrollTop=keepScroll?ratio*m:0;}
+  pages.innerHTML="";
+  if(!window.PagedModule||!window.PagedModule.Previewer){fallbackRender(src);restore();return;}
   var blobUrl=null;try{blobUrl=URL.createObjectURL(new Blob([PAGED_CSS],{type:"text/css"}));}catch(e){}
   try{
     var prev=new window.PagedModule.Previewer();
@@ -175,19 +180,23 @@ function runPaged(src,pass){
       if(typeof applyFooter==="function")applyFooter();
       var n=pages.querySelectorAll(".pagedjs_page").length||((flow&&flow.total)||0);
       setHead("Total "+n+" page"+(n>1?"s":""));
-      document.getElementById("viewer").scrollTop=0;
-      
-    }).catch(function(err){console.error(err);fallbackRender(src);});
-  }catch(e){console.error(e);fallbackRender(src);}
+      restore();
+    }).catch(function(err){console.error(err);fallbackRender(src);restore();});
+  }catch(e){console.error(e);fallbackRender(src);restore();}
 }
-function renderMarkdown(text){
+/* 미리보기만 재생성(에디터 내용은 건드리지 않음). keepScroll=true면 뷰어 스크롤 위치 유지(편집 중 튐 방지) */
+function renderPreview(text,keepScroll){
 window.__lastText=text;
-document.getElementById("raw").innerHTML=hlMd(text);
 var src=buildSource(text);
 document.body.classList.add("loaded");
-document.getElementById("editor").scrollTop=0;
 setHead("페이지 분할 중...");
-runPaged(src);
+runPaged(src,keepScroll);
+}
+/* 파일 로드 등: 에디터(textarea+미러)에 내용을 채우고 미리보기도 처음부터 생성 */
+function renderMarkdown(text){
+var ta=document.getElementById("rawInput");if(ta){ta.value=text;ta.scrollTop=0;}
+var mirror=document.getElementById("raw");if(mirror){mirror.innerHTML=hlMd(text);mirror.scrollTop=0;}
+renderPreview(text,false);
 }
 function loadFile(file){window.__lastFile=file;window.__fname=(file.name||"document").replace(/\.(md|markdown|txt)$/i,"");
 var r=new FileReader();r.onload=function(e){renderMarkdown(e.target.result);};r.readAsText(file,"utf-8");}
@@ -295,6 +304,23 @@ sp.addEventListener("mousedown",function(e){if(e.target===fb||fb.contains(e.targ
 window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.getBoundingClientRect();var w=e.clientX-r.left;w=Math.max(180,Math.min(r.width-260,w));editor.style.flex="0 0 "+w+"px";lastBasis=w+"px";});
 window.addEventListener("mouseup",function(){if(dragging){dragging=false;document.body.style.userSelect="";document.body.style.cursor="";}});
 setIco();})();
+/* MD 원본 ↔ 미리보기 비율 스크롤 동기화. 한쪽의 스크롤 비율을 반대쪽에 반영.
+   lockUntil: 프로그램적 스크롤이 되돌려 트리거하는 피드백 루프 차단(짧은 시간 창 동안 상호 이벤트 무시).
+   페인트 스케줄(rAF)에 의존하지 않아 어떤 환경에서도 lock이 걸린 채 남지 않음.
+   원본이 접혀 있으면(editor-collapsed) 동기화하지 않음. */
+(function(){var editor=document.getElementById("rawInput"),viewer=document.getElementById("viewer");if(!editor||!viewer)return;var lockUntil=0;
+var clock=(window.performance&&performance.now)?function(){return performance.now();}:function(){return +new Date();};
+function link(from,to){from.addEventListener("scroll",function(){if(clock()<lockUntil)return;if(document.body.classList.contains("editor-collapsed"))return;var fm=from.scrollHeight-from.clientHeight;if(fm<=0)return;var ratio=from.scrollTop/fm;lockUntil=clock()+80;to.scrollTop=ratio*(to.scrollHeight-to.clientHeight);});}
+link(editor,viewer);link(viewer,editor);})();
+/* 원본 직접 편집: 입력 시 색상 미러 갱신 + 적응형 디바운스로 미리보기 재생성(뷰어 위치 보존).
+   textarea 스크롤 시 뒤의 색상 미러를 같은 위치로 이동시켜 글자 정합 유지. */
+(function(){var ta=document.getElementById("rawInput"),mirror=document.getElementById("raw");if(!ta||!mirror)return;var t=null;
+/* 적응형 디바운스: Paged.js 재분할 비용은 페이지 수에 비례(측정 ~17ms/페이지).
+   문서가 클수록 대기를 늘려 재분할 빈도를 낮춤 → 소형(≤~11p)은 350ms로 즉각적, 대형은 최대 900ms.
+   페이지 수는 직전 렌더 결과에서 읽고, 없으면(첫 편집/연속 렌더) 글자수로 추정(~650자/페이지). */
+function editDelay(){var n=document.querySelectorAll("#pages .pagedjs_page").length;if(!n)n=Math.ceil(ta.value.length/650);return Math.min(900,Math.max(350,n*30));}
+ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);},editDelay());});
+ta.addEventListener("scroll",function(){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;});})();
 /* 브라우저 기본 파일열기 차단(전역) + 파일을 드롭하면 로드.
    이미 문서가 열려 있으면(오버레이가 숨겨진 상태) 새 파일로 교체된다.
    점선 박스 위 드롭은 아래 핸들러가 stopPropagation 하므로 중복 로드 없음. */
