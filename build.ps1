@@ -40,7 +40,24 @@ if ($doExe) {
   }
   $built = Join-Path $appDir "dist\MDeautify-app\MDeautify-app-win_x64.exe"
   if (-not (Test-Path $built)) { throw "빌드 산출물을 찾을 수 없음: $built" }
-  Copy-Item $built (Join-Path $release "MDeautify.exe") -Force
+  $outExe = Join-Path $release "MDeautify.exe"
+  Copy-Item $built $outExe -Force
+
+  # ★ exe 버전 리소스 패치 (Neutralino 기본 'A Neutralinojs application' → 실제 앱 설명)
+  #   버전은 neutralino.config.json 의 version 값과 동기화.
+  $rcedit = Join-Path $root "tools\rcedit-x64.exe"
+  if (Test-Path $rcedit) {
+    $cfg = Get-Content (Join-Path $appDir "neutralino.config.json") -Raw | ConvertFrom-Json
+    $ver = $cfg.version
+    & $rcedit $outExe `
+      --set-version-string "FileDescription" "MDeautify - Markdown to PDF" `
+      --set-version-string "ProductName" "MDeautify" `
+      --set-file-version "$ver.0" `
+      --set-product-version "$ver" | Out-Null
+    Write-Host "[EXE] 버전 리소스 패치: 설명='MDeautify - Markdown to PDF', 버전=$ver" -ForegroundColor DarkGray
+  } else {
+    Write-Host "[EXE] rcedit 없음 → 버전 리소스 패치 건너뜀 (tools\rcedit-x64.exe)" -ForegroundColor Yellow
+  }
   Write-Host "[EXE] release\MDeautify.exe (단일 파일, 리소스 내장) 생성" -ForegroundColor Green
 }
 

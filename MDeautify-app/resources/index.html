@@ -11,6 +11,12 @@
       <script src="js/diagram.js"></script>
     </head>
     <body>
+      <div id='bootSplash' class='boot-splash' aria-hidden='true'>
+        <svg width='44' height='44' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'>
+          <path d='M10 33 V18 L20 28 L30 18 V33' fill='none' stroke='#fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>
+          <path d='M36.5 8 C36.5 12.8 38.7 15 43.5 15 C38.7 15 36.5 17.2 36.5 22 C36.5 17.2 34.3 15 29.5 15 C34.3 15 36.5 12.8 36.5 8 Z' fill='#fff'/>
+        </svg>
+      </div>
       <div id='bar'>
         <span class='brand'>
           <svg class='brand-mark' width='30' height='30' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg' aria-hidden='true'>
@@ -21,12 +27,12 @@
           </svg>
           <span class='brand-lock'><span class='brand-title'><span class='m-hi'>MD</span><span class='m-rest'>eautify</span><span class='season'>md2pdf</span></span></span>
         </span>
-        <button id='btnOpenTop' title='다른 MD 파일 열기'>MD 파일 열기</button>
+        <button id='btnOpenTop' title='MD 파일 열기 · 이미지 넣기'>파일 열기</button>
         <button id='btnTheme' title='PDF 설정'>PDF 설정</button>
         <span class='spacer'></span>
         <label class='mode-sw' title='다크 모드'><span>다크 모드</span><input type='checkbox' id='tmDark' class='tm-switch'></label>
         <button id='btnPrint' title='인쇄창에서 대상을 “PDF로 저장”으로 선택하세요. “Microsoft Print to PDF”는 링크가 빠집니다.'>PDF 저장/인쇄</button>
-        <input id='fileInput' type='file' accept='.md,.markdown,.txt' style='display:none'>
+        <input id='fileInput' type='file' accept='.md,.markdown,.txt,image/*' multiple style='display:none'>
       </div>
       <div id='themeModal' hidden>
         <div class='tm-card'>
@@ -89,7 +95,7 @@
         </div>
       </div>
       <div id='main'>
-        <section id='editor'><pre id='raw' aria-hidden='true'></pre><textarea id='rawInput' spellcheck='false' wrap='soft' placeholder='여기에서 마크다운을 직접 수정할 수 있습니다.'></textarea></section>
+        <section id='editor'><pre id='raw' aria-hidden='true'></pre><textarea id='rawInput' spellcheck='false' wrap='soft' placeholder='여기에서 마크다운을 직접 수정할 수 있습니다.'></textarea><button id='fileBadge' type='button' hidden title='불러온 파일 보기'><svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8'/></svg><span id='fileBadgeN'>0</span><span id='fileBadgeWarn' aria-hidden='true' title='식별 안 된 이미지가 있습니다'>!</span></button><div id='filePop' hidden></div></section>
         <div id='splitter'>
           <button id='foldBtn' type='button' title='원본 접기/펼치기' aria-label='원본 접기/펼치기'><span class='fold-ico'>‹</span></button>
         </div>
@@ -104,14 +110,16 @@
               <path d='M7 9l5 -5l5 5'/>
               <path d='M12 4l0 12'/>
             </svg>
-            <h2>여기에 .md 파일을 끌어다 놓으세요</h2>
-            <div class='sub'>또는 하단의 <b>MD 파일 열기</b>를 눌러 선택하세요.</div>
+            <h2>MD 파일을 끌어다 놓거나 열어서 시작하세요</h2>
+            <div class='sub'>이미지가 있으면 <b>.md 와 이미지 파일을 함께</b>(또는 폴더째) 끌어다 놓으세요. 또는 아래 <b>파일 열기</b> 버튼으로 선택.</div>
             <div class='drop-note'>왼쪽은 마크다운 원본, 오른쪽은 실제 페이지 단위 미리보기입니다.<br>「PDF 저장/인쇄」 → 인쇄창에서 대상을 <b>‘PDF로 저장’</b> 으로 고르세요. <b>‘Microsoft Print to PDF’ 는 링크가 빠지니 피하세요.</b> (한 번 고르면 다음부터 기본값으로 유지됩니다.)</div>
-            <button id='btnOpen'>MD 파일 열기</button>
+            <button id='btnOpen'>파일 열기</button>
           </div>
         </div>
       </div>
       <div id='src'></div>
+      <script src="js/neutralino.js"></script>
+      <script src="js/settings-store.js"></script>
       <script src="js/app.js"></script>
       <script src="js/settings/theme.js"></script>
       <script src="js/settings/font.js"></script>

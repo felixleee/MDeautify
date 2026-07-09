@@ -1,8 +1,12 @@
 # ── 빌드 산출물 ──
 /release/
 /MDeautify.exe
+/MDeautify.zip
 MDeautify-app/bin/
 MDeautify-app/dist/
+
+# ── 로컬 개발 설정 ──
+.claude/
 
 # ── 로그 ──
 *.log
