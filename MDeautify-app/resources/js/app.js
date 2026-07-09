@@ -247,9 +247,9 @@ var r=new FileReader();r.onload=function(e){renderMarkdown(e.target.result);};r.
 /* 이미 문서를 불러온 상태에서 '다른 MD'로 교체하기 전 확인(편집분 유실 경고). 문서가 없으면 바로 진행. */
 window.__confirmReplaceDoc=async function(){
   if(!document.body.classList.contains("loaded"))return true;
-  var msg="이미 불러온 MD가 있어요. 편집한 내용은 저장되지 않을 수 있습니다.\n다른 파일을 여시겠어요?";
-  if(typeof window.NL_PORT!=="undefined"&&window.Neutralino&&Neutralino.os&&Neutralino.os.showMessageBox){
-    try{var res=await Neutralino.os.showMessageBox("파일 열기",msg,"YES_NO","QUESTION");return res==="YES"||res===true;}catch(e){return true;}
+  var msg="이미 불러온 MD가 있어요.\n편집한 내용은 저장되지 않을 수 있습니다.\n다른 파일을 여시겠어요?";
+  if(window.__appConfirm){
+    return await window.__appConfirm({title:"다른 파일 열기",message:msg,okText:"열기",cancelText:"취소"});
   }
   try{return window.confirm(msg);}catch(e){return true;}
 };
@@ -349,7 +349,7 @@ window.MD2R=(function(){var K="md2pdf_remember",regs=[];function on(){try{var v=
   });
 })();
 
-document.getElementById("btnPrint").addEventListener("click",function(){if(!document.body.classList.contains("loaded")){alert("변환된 내용이 없습니다. 먼저 MD 파일을 불러오세요.");return;}window.print();});
+document.getElementById("btnPrint").addEventListener("click",function(){if(!document.body.classList.contains("loaded")){if(window.__appAlert)window.__appAlert("먼저 MD 파일을 불러오세요.","변환할 내용이 없어요");else alert("변환된 내용이 없습니다. 먼저 MD 파일을 불러오세요.");return;}window.print();});
 /* 상단 'MD 파일 열기' — 파일 선택 창을 열어 다른 MD 파일 불러오기 */
 var _btnOpenTop=document.getElementById("btnOpenTop");if(_btnOpenTop)_btnOpenTop.addEventListener("click",function(){if(window.__nativeOpen){window.__nativeOpen();return;}var fi=document.getElementById("fileInput");if(fi){fi.value="";fi.click();}});
 /* MD 원본/미리보기 리사이즈 핸들 + 가운데 접기/펼치기 */
@@ -605,7 +605,7 @@ window.__resolveLocalImages=async function(src){
         a.href=URL.createObjectURL(blob);a.download=zipName;document.body.appendChild(a);a.click();
         setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);
       }
-    }catch(e){try{Neutralino.debug.log("[zip] "+e);}catch(_){}alert("ZIP 저장 중 문제가 발생했습니다.");}
+    }catch(e){try{Neutralino.debug.log("[zip] "+e);}catch(_){}if(window.__appAlert)window.__appAlert("ZIP 저장 중 문제가 발생했습니다.","오류");else alert("ZIP 저장 중 문제가 발생했습니다.");}
   };
 })();
 /* ===== 불러온 파일 뱃지 + 팝오버 (문서 + 참조 이미지 상태 + 미참조 드롭 이미지) ===== */
@@ -628,7 +628,7 @@ window.__resolveLocalImages=async function(src){
         h+="<div class='fp-row' title='"+esc(f.name)+"'><span class='fp-ico'>🖼️</span><span class='fp-name'>"+esc(f.name)+"</span><span class='fp-st "+st[0]+"'>"+st[1]+"</span><button class='fp-ins-btn' type='button' data-ins='"+esc(f.name)+"' title='커서 위치에 삽입: "+esc(f.name)+"'>삽입</button>"+(inPool?"<button class='fp-del-btn' type='button' data-del='"+esc(f.name)+"' title='목록에서 제거: "+esc(f.name)+"' aria-label='삭제'>✕</button>":"<span class='fp-del-ph'></span>")+"</div>";}
       h+="</div>";
     }else h+="<div class='fp-sec'><div class='fp-empty'>참조된 이미지 없음</div></div>";
-    if(anyMissing)h+="<div class='fp-hint'>식별 안 된 이미지가 있어요. <b>‘파일 열기’</b>로 이미지를 넣거나, <b>.md와 이미지를 함께</b>(또는 폴더째) 끌어다 놓으면 표시됩니다.</div>";
+    if(anyMissing)h+="<div class='fp-hint'>식별 안 된 이미지가 있어요. <b>‘파일 열기’</b>로 이미지를 넣거나, <b>이미지</b>(또는 폴더째) 끌어다 놓으면 표시됩니다.</div>";
     pop.innerHTML=h;
   }
   window.__renderFileBadge=build;

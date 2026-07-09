@@ -124,6 +124,21 @@ body.loaded #fileBadge{display:inline-flex;}
 #filePop .fp-h-top{display:flex;align-items:center;justify-content:flex-start;gap:8px;padding-right:26px;}
 #filePop .fp-zip-btn{flex:0 0 auto;border:1px solid color-mix(in srgb,var(--ui-brand-accent) 30%,transparent);background:color-mix(in srgb,var(--ui-brand-accent) 14%,transparent);color:var(--ui-brand-accent);font-size:11px;font-weight:700;letter-spacing:0;text-transform:none;padding:2px 9px;border-radius:5px;line-height:1.4;cursor:pointer;transition:background .12s;}
 #filePop .fp-zip-btn:hover{background:color-mix(in srgb,var(--ui-brand-accent) 24%,transparent);}
+/* ===== 인-앱 모달 (네이티브 confirm/alert 대체, 앱 중앙) ===== */
+#appModal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,17,26,.44);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
+#appModal[hidden]{display:none;}
+#appModal .am-card{background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:12px;padding:20px 22px;box-shadow:0 18px 50px rgba(0,0,0,.4);width:340px;max-width:calc(100vw - 40px);}
+#appModal .am-title{font-size:14px;font-weight:700;color:var(--tm-fg);margin:0 0 8px;}
+#appModal .am-msg{font-size:13px;line-height:1.55;color:var(--tm-fg2);}
+#appModal .am-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+#appModal .am-btn{font:inherit;font-size:12.5px;font-weight:700;border-radius:7px;padding:7px 15px;cursor:pointer;transition:background .12s,border-color .12s;}
+#appModal .am-cancel{border:1px solid var(--tm-border);background:transparent;color:var(--tm-fg2);}
+#appModal .am-cancel:hover{border-color:var(--tm-bhover);background:var(--tm-hover-bg);}
+#appModal .am-ok{border:1px solid var(--ui-brand-accent);background:var(--ui-brand-accent);color:#fff;}
+#appModal .am-ok:hover{background:color-mix(in srgb,var(--ui-brand-accent) 88%,#000);}
+#appModal .am-ok:focus-visible{outline:2px solid var(--ui-brand-accent);outline-offset:2px;}
+#appModal .am-danger{border-color:#dc2626;background:#dc2626;}
+#appModal .am-danger:hover{background:#b91c1c;}
 #filePop .fp-sec{margin-top:10px;}
 #filePop .fp-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid color-mix(in srgb,var(--tm-border) 60%,transparent);}
 #filePop .fp-row:first-of-type{border-top:0;}
@@ -194,10 +209,10 @@ body.loaded #fileBadge{display:inline-flex;}
 .content blockquote{background:#eff6ff;background:color-mix(in srgb, var(--accent) 9%, #fff);border-left:4px solid var(--accent);padding:8px 12px;border-radius:4px;margin:12px 0;color:var(--brand);}
 .content blockquote p{margin:0;}
 .content figure{margin:14px 0;text-align:center;} .content figure svg{max-width:100%;height:auto;}
-.content figure img{max-width:100%;height:auto;}
+.content figure img{max-width:100%;max-height:250mm;width:auto;height:auto;}
 .content figure figcaption{font-size:calc(var(--doc-size) * 0.82);color:#64748b;margin-top:6px;}
-/* 이미지: 페이지 폭 넘침 방지 */
-.content img{max-width:100%;height:auto;display:block;margin:12px auto;border-radius:4px;}
+/* 이미지: 페이지 폭·높이 넘침 방지(세로로 긴 이미지가 페이지보다 커서 잘리는 것 방지 — 본문영역 261mm 안으로 축소) */
+.content img{max-width:100%;max-height:250mm;width:auto;height:auto;display:block;margin:12px auto;border-radius:4px;}
 /* h5, h6 (기존 h4 이하 스케일 이어서) */
 .content h5{font-size:calc(var(--doc-size) * 1.0);color:#334155;font-weight:700;margin:10px 0 5px;}
 .content h6{font-size:calc(var(--doc-size) * 0.95);color:#64748b;font-weight:700;margin:10px 0 5px;}

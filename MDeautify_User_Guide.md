@@ -2,8 +2,8 @@
 title: MDeautify User Guide
 subtitle: The easiest way to turn Markdown (.md) into a clean PDF
 kicker: MD2PDF USER GUIDE
-Version: v1.0
-Date: 2026-07-06
+Version: v1.1
+Date: 2026-07-09
 Audience: MDeautify users
 ---
 
@@ -22,13 +22,13 @@ This guide itself was made with MDeautify. In other words, **the cover, headings
 
 ```mermaid
 flowchart TD
-A["Open MD file<br>Drag a .md file onto the dashed box"] --> B["Check the preview<br>See the real PDF layout on the right"]
+A["Open MD file<br>Drag & drop · button · double-click"] --> B["Check the preview<br>See the real PDF layout on the right"]
 B --> C["Adjust PDF settings<br>Change theme, font, and footer to taste"]
 C --> D["Save / Print PDF<br>Click the save button at the top"]
 D --> E["Save as PDF<br>Pick 'Save as PDF' as the destination"]
 ```
 
-1. **Open MD file** — Drag a `.md` file onto the center dashed box, or click the `Open MD file` button.
+1. **Open MD file** — Drag a `.md` file onto the window (together with the image files if any, or the whole folder), or pick one with the `Open MD file` button. (You can also just double-click a `.md` file.)
 2. **Check the preview** — The real PDF layout appears on the right, page by page.
 3. **Adjust PDF settings** — Change color, font, and footer to taste under `PDF settings` at the top.
 4. **Save PDF** — Click `Save / Print PDF` at the top and choose **"Save as PDF"** in the printer dialog. (See section F for details.)
@@ -162,6 +162,31 @@ Use `- [ ]` (empty) / `- [x]` (checked) to build a checkbox list.
 
 - [x] Done
 - [ ] To do
+
+### Images
+
+There are two ways to add images.
+
+**① Paste (easiest)** — Capture or copy an image and press `Ctrl+V` in the editor on the left. The image is **stored inside the document itself**, so it won't break when you move the file or open it on another PC. It's inserted at the cursor, **auto-shrunk** if wider than the page, and **automatically downsized** for very large photos to save space.
+
+**② Reference an image file in the same folder** — Put the image next to the `.md` (or in a subfolder) and refer to it by filename.
+
+```
+![socket](socket.png)
+![logo](images/logo.png)
+```
+
+With this method, images show up when you open the file one of these ways: **① drag the `.md` together with the image files (or the whole folder) onto the window**, or **② use the `Open MD file` button / double-click the `.md`.** (The program needs access to the image files, so dropping **only** the `.md` by itself won't show images — include the images too, or open via the button/double-click.)
+
+> Note: Web URLs like `![](https://...)` also work.
+
+### Reviewing loaded files · Saving as a ZIP bundle
+
+Click the **clip icon** above the editor (it also shows the number of loaded files) to open the **list of files attached to the current document**.
+
+- The list shows the document (`.md`) and images; each image is marked **`✓ Available`** or **`✗ Not found`** depending on whether it's actually used in the body.
+- The **`Insert`** button next to an image inserts a `![](filename)` reference at the cursor position.
+- The **`Save ZIP`** button at the top of the list bundles **the current MD text and all loaded images into a single `.zip`**. Unzip it, keep the folder together, and open it again — the images stay linked. Handy for **backing up or handing off the document together with its images**.
 
 ### Diagrams
 
