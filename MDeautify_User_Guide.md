@@ -2,8 +2,8 @@
 title: MDeautify User Guide
 subtitle: The easiest way to turn Markdown (.md) into a clean PDF
 kicker: MD2PDF USER GUIDE
-Version: v1.1
-Date: 2026-07-09
+Version: v1.1.2
+Date: 2026-07-10
 Audience: MDeautify users
 ---
 
@@ -165,11 +165,13 @@ Use `- [ ]` (empty) / `- [x]` (checked) to build a checkbox list.
 
 ### Images
 
-There are two ways to add images.
+There are three ways to add images.
 
 **① Paste (easiest)** — Capture or copy an image and press `Ctrl+V` in the editor on the left. The image is **stored inside the document itself**, so it won't break when you move the file or open it on another PC. It's inserted at the cursor, **auto-shrunk** if wider than the page, and **automatically downsized** for very large photos to save space.
 
-**② Reference an image file in the same folder** — Put the image next to the `.md` (or in a subfolder) and refer to it by filename.
+**② Drag onto the editor** — Drop an image file where you want it in the left editor and a `![](filename)` reference is **inserted right at that spot**, with the badge flashing green to confirm. (Dropping onto the preview on the right adds it to the "loaded files" list instead of inserting it.)
+
+**③ Reference an image file in the same folder** — Put the image next to the `.md` (or in a subfolder) and refer to it by filename.
 
 ```
 ![socket](socket.png)
@@ -180,12 +182,25 @@ With this method, images show up when you open the file one of these ways: **①
 
 > Note: Web URLs like `![](https://...)` also work.
 
+**Resizing images** — Add ` =WxH` after the image reference to set its size.
+
+```
+![logo](logo.png =300x200)   width 300 · height 200 (px)
+![logo](logo.png =300x)      width 300, height auto
+![logo](logo.png =x200)      height 200, width auto
+![logo](logo.png =300)       width 300
+![logo](logo.png =50%)       50% of the page width
+```
+
+Even without a size, very tall images are automatically scaled down to fit the page height. (For finer control you can also write an HTML tag directly, e.g. `<img src="logo.png" width="300">`.)
+
 ### Reviewing loaded files · Saving as a ZIP bundle
 
 Click the **clip icon** above the editor (it also shows the number of loaded files) to open the **list of files attached to the current document**.
 
-- The list shows the document (`.md`) and images; each image is marked **`✓ Available`** or **`✗ Not found`** depending on whether it's actually used in the body.
-- The **`Insert`** button next to an image inserts a `![](filename)` reference at the cursor position.
+- Each image shows a status: **`✓ In use`** (referenced and shown in the body) · **`● Available`** (loaded but not yet in the body) · **`✗ Not found`** (referenced in the body but the file is missing).
+- **`Insert`** button (in-use · available): inserts a `![](filename)` reference at the cursor position.
+- **`Remove ref`** button (not found): deletes the missing image's reference from the body.
 - The **`Save ZIP`** button at the top of the list bundles **the current MD text and all loaded images into a single `.zip`**. Unzip it, keep the folder together, and open it again — the images stay linked. Handy for **backing up or handing off the document together with its images**.
 
 ### Diagrams

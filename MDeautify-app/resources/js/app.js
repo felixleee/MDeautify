@@ -115,9 +115,34 @@ var title=meta.title||meta["제목"]||"";if(title)srcmd=srcmd.replace(/^\s*#\s+(
 marked.setOptions({gfm:true,breaks:false});
 /* 삭선은 겹물결(~~)일 때만. 홑물결(~)은 범위표기(예:166~169)로 보고 그대로 둠 */
 if(!marked.__delFix){marked.__delFix=1;marked.use({tokenizer:{del(src){var m=/^~~(?=\S)([\s\S]*?\S)~~/.exec(src);if(m){return {type:"del",raw:m[0],text:m[1],tokens:this.lexer.inlineTokens(m[1])};}if(src.charCodeAt(0)===126){return {type:"text",raw:"~",text:"~"};}return false;}}});}
-/* 이미지 경로에 공백이 있으면(예: 미디어 (3).jpg) marked가 URL로 인식 못 해 <img>가 안 생김.
-   → 감싸지 않은 dest에 공백이 있으면 <>로 감싼다(괄호 1단계 중첩 허용, 제목 포함/이미 <>인 것은 제외). 줄 수는 유지. */
-srcmd=srcmd.replace(/!\[([^\]]*)\]\(\s*([^()]*(?:\([^)]*\)[^()]*)*)\s*\)/g,function(m,alt,dest){if(!dest||dest.charAt(0)==="<")return m;if(/["']/.test(dest))return m;if(!/\s/.test(dest))return m;return "!["+alt+"](<"+dest.trim()+">)";});
+/* 아래 이미지 전처리는 코드블록(``` / ~~~, 백틱 개수 무관)·인라인 코드 '밖'에서만 수행
+   → 안내서의 '문법 예시'가 실제로 변환돼 버리는 것 방지. 줄 수는 그대로 유지. */
+function outsideCode(text,fn){
+  var lines=text.split("\n"),out=[],fence=null;
+  for(var li=0;li<lines.length;li++){var ln=lines[li],fm=ln.match(/^\s*(`{3,}|~{3,})/);
+    if(fence){out.push(ln);if(fm&&fm[1].charAt(0)===fence.ch&&fm[1].length>=fence.len&&/^\s*(`{3,}|~{3,})\s*$/.test(ln))fence=null;continue;}
+    if(fm){fence={ch:fm[1].charAt(0),len:fm[1].length};out.push(ln);continue;}
+    out.push(ln.split(/(`+[^`]*`+)/g).map(function(seg,i){return i%2?seg:fn(seg);}).join(""));  /* 인라인 코드 밖만 */
+  }
+  return out.join("\n");
+}
+srcmd=outsideCode(srcmd,function(s){
+  /* 이미지 크기 단축 문법(marked 미지원): ![alt](src =300x200)·=300x·=x200·=50%·=300 → <img>. */
+  s=s.replace(/!\[([^\]]*)\]\(\s*([^()]*(?:\([^)]*\)[^()]*)*?)\s+=\s*(\d+x\d+|\d+x|x\d+|\d+%|\d+)\s*\)/g,function(m,alt,dest,sz){
+    var d=dest.replace(/^<|>$/g,"").trim();if(!d||/["']/.test(d))return m;
+    var a;
+    if(/^\d+x\d+$/.test(sz)){var p=sz.split("x");a=' width="'+p[0]+'" height="'+p[1]+'"';}
+    else if(/^\d+x$/.test(sz))a=' width="'+sz.slice(0,-1)+'"';
+    else if(/^x\d+$/.test(sz))a=' height="'+sz.slice(1)+'"';
+    else if(/^\d+%$/.test(sz))a=' style="width:'+sz.slice(0,-1)+'%"';
+    else a=' width="'+sz+'"';
+    function ea(x){return String(x).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+    return '<img src="'+ea(d)+'" alt="'+ea(alt)+'"'+a+'>';
+  });
+  /* 공백 포함 경로(예: 미디어 (3).jpg)는 marked가 인식하도록 <>로 감쌈(줄 수 유지). */
+  s=s.replace(/!\[([^\]]*)\]\(\s*([^()]*(?:\([^)]*\)[^()]*)*)\s*\)/g,function(m,alt,dest){if(!dest||dest.charAt(0)==="<")return m;if(/["']/.test(dest))return m;if(!/\s/.test(dest))return m;return "!["+alt+"](<"+dest.trim()+">)";});
+  return s;
+});
 var src=document.getElementById("src");
 src.innerHTML=buildCover(meta)+"<div class='content'>"+marked.parse(srcmd)+"</div>";
 /* 링크는 새 탭/새 창으로 열기 */
@@ -483,9 +508,10 @@ ta.addEventListener("scroll",function(){mirror.scrollTop=ta.scrollTop;mirror.scr
     if(mdPath){openMd(mdPath);return;}   /* MD 열기 = 기존 그대로 */
     if(imgPaths.length&&document.body.classList.contains("loaded")){  /* 이미지 = 드래그&드랍처럼 풀에 추가 후 재렌더 */
       window.__drop=window.__drop||{};
-      for(var k=0;k<imgPaths.length;k++){var pth=imgPaths[k];try{var du=await readAsDataUrl(pth);window.__drop[baseOf(pth)]=await window.__img.encode(du,mimeOf(pth));}catch(e){log("[open img] "+pth);}}
+      var nAdded=0;for(var k=0;k<imgPaths.length;k++){var pth=imgPaths[k];try{var du=await readAsDataUrl(pth);window.__drop[baseOf(pth)]=await window.__img.encode(du,mimeOf(pth));nAdded++;}catch(e){log("[open img] "+pth);}}
       var cur=document.getElementById("rawInput");
       renderPreview(cur?cur.value:(window.__lastText||""),true);
+      if(nAdded&&window.__flashBadge)window.__flashBadge(nAdded);
     }
   }catch(e){log("[open] "+e);}}
   window.__nativeOpen=nativeOpen;
@@ -526,7 +552,7 @@ window.__resolveLocalImages=async function(src){
     else if(entry.isDirectory){var rd=entry.createReader(),acc=[];(function rd2(){rd.readEntries(function(es){if(!es.length){(async function(){for(var c=0;c<acc.length;c++)await walk(acc[c],out);res();})();}else{acc=acc.concat(es);rd2();}},function(){res();});})();}
     else res();
   });}
-  async function handle(entries,flat){
+  async function handle(entries,flat,insAt){
     var files=[];
     if(entries&&entries.length){for(var i=0;i<entries.length;i++)await walk(entries[i],files);}
     else files=flat||[];
@@ -542,13 +568,25 @@ window.__resolveLocalImages=async function(src){
       window.__mdName=md.name;window.__fname=md.name.replace(/\.(md|markdown|txt)$/i,"");
       renderMarkdown(text);
     }else if(imgs.length&&document.body.classList.contains("loaded")){
-      /* 이미지만 드롭 → md 본문에 바로 넣지 않고 파일 풀(window.__drop)에만 추가.
-         같은 이름의 '못 찾음' 참조가 있으면 재렌더 시 자동으로 해석됨. 없으면 '사용 가능'으로 남고
-         팝오버에서 클릭해 ![](이름) 참조를 삽입할 수 있음. */
+      /* 이미지만 드롭 → 파일 풀(window.__drop)에 추가.
+         에디터(textarea) 위에 드롭했으면(insAt!=null) 그 위치에 ![](이름) 참조까지 삽입,
+         그 밖의 위치면 풀에만 추가(팝오버에서 삽입 가능). */
       window.__drop=window.__drop||{};
-      for(var m=0;m<imgs.length;m++){var ig=imgs[m];try{var du2=await readDataUrl(ig);window.__drop[ig.name]=await window.__img.encode(du2,ig.type||mimeByName(ig.name));}catch(e){}}
-      var cur=document.getElementById("rawInput");
-      renderPreview(cur?cur.value:(window.__lastText||""),true);
+      var added=[];
+      for(var m=0;m<imgs.length;m++){var ig=imgs[m];try{var du2=await readDataUrl(ig);window.__drop[ig.name]=await window.__img.encode(du2,ig.type||mimeByName(ig.name));added.push(ig.name);}catch(e){}}
+      var ta=document.getElementById("rawInput");
+      if(insAt!=null&&ta&&added.length){
+        var refs=added.map(function(n){var alt=n.replace(/\.[a-z0-9]+$/i,"");var dest=/\s/.test(n)?"<"+n+">":n;return "!["+alt+"]("+dest+")";}).join("\n");
+        var pos=Math.min(Math.max(0,insAt|0),ta.value.length),before=ta.value.slice(0,pos),after=ta.value.slice(pos);
+        var block=(before&&!/\n$/.test(before)?"\n":"")+refs+(after&&!/^\n/.test(after)?"\n":"");
+        var nt=before+block+after;ta.value=nt;
+        var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function")mirror.innerHTML=hlMd(nt);
+        try{ta.selectionStart=ta.selectionEnd=(before+block).length;}catch(e){}
+        renderPreview(nt,true);
+      }else{
+        renderPreview(ta?ta.value:(window.__lastText||""),true);
+      }
+      if(added.length&&window.__flashBadge)window.__flashBadge(added.length);
     }
   }
   /* 파일 선택창(브라우저)에서 고른 File 목록도 드롭과 동일 처리(.md=문서 열기 / 이미지=풀에 추가) */
@@ -556,11 +594,17 @@ window.__resolveLocalImages=async function(src){
   function hasFiles(dt){return dt&&dt.types&&Array.prototype.indexOf.call(dt.types,"Files")>=0;}
   document.addEventListener("dragover",function(e){e.preventDefault();if(hasFiles(e.dataTransfer))document.body.classList.add("drag");});
   document.addEventListener("dragleave",function(e){if(e.relatedTarget===null||(e.clientX<=0&&e.clientY<=0))document.body.classList.remove("drag");});
+  /* 에디터(textarea) 위에 드롭했으면 그 지점의 글자 위치(offset)를 구함 → 이미지 참조를 그 자리에 삽입 */
+  function dropCaret(x,y){var ta=document.getElementById("rawInput");if(!ta||!document.body.classList.contains("loaded"))return null;
+    try{var cp=document.caretPositionFromPoint&&document.caretPositionFromPoint(x,y);if(cp&&cp.offsetNode===ta)return cp.offset;}catch(e){}
+    try{var r=ta.getBoundingClientRect();if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return ta.value.length;}catch(e){}  /* 정확한 위치 못 구하면 에디터 영역 안일 때 끝에 삽입 */
+    return null;}
   document.addEventListener("drop",function(e){e.preventDefault();document.body.classList.remove("drag");var dt=e.dataTransfer;if(!dt)return;
+    var insAt=dropCaret(e.clientX,e.clientY);
     var entries=[],items=dt.items;
     if(items&&items.length&&items[0].webkitGetAsEntry){for(var i=0;i<items.length;i++){var en=items[i].webkitGetAsEntry&&items[i].webkitGetAsEntry();if(en)entries.push(en);}}
     var flat=[];if(dt.files){for(var k=0;k<dt.files.length;k++)flat.push(dt.files[k]);}
-    handle(entries,flat);
+    handle(entries,flat,insAt);
   });
 })();
 /* ===== ZIP 저장: 현재 MD + 풀(window.__drop)의 이미지들을 무압축(store) zip으로 묶어 저장 ===== */
@@ -611,6 +655,23 @@ window.__resolveLocalImages=async function(src){
 /* ===== 불러온 파일 뱃지 + 팝오버 (문서 + 참조 이미지 상태 + 미참조 드롭 이미지) ===== */
 (function(){
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+  /* '식별안됨' 이미지 = MD에 ![](이름) 참조가 있으나 못 찾음 → 그 참조를 본문에서 삭제(파일명/경로 basename 일치). */
+  function removeRefFromMd(name){
+    var ta=document.getElementById("rawInput");if(!ta)return;
+    var re=/!\[[^\]]*\]\(\s*(<[^>]*>|[^()]*(?:\([^)]*\)[^()]*)*)\s*\)/g,changed=false;
+    var out=ta.value.replace(re,function(m,dest){
+      var d=dest.replace(/^<|>$/g,"").replace(/\s+["'][^"']*["']\s*$/,"").trim();  /* <> 벗기고 제목 제거 */
+      try{d=decodeURIComponent(d);}catch(e){}
+      var base=d.split(/[\\/]/).pop();
+      if(d===name||base===name){changed=true;return "";}
+      return m;
+    });
+    if(!changed)return;
+    out=out.replace(/\n{3,}/g,"\n\n");  /* 참조만 있던 줄이 비면서 생긴 과한 빈 줄 정리 */
+    ta.value=out;
+    var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function")mirror.innerHTML=hlMd(out);
+    if(typeof renderPreview==="function")renderPreview(out,true);
+  }
   var badge=document.getElementById("fileBadge"),num=document.getElementById("fileBadgeN"),pop=document.getElementById("filePop");
   function build(){
     var md=window.__mdName||(window.__fname?window.__fname+".md":null),imgs=window.__imgFiles||[];
@@ -623,9 +684,10 @@ window.__resolveLocalImages=async function(src){
     if(imgs.length){
       h+="<div class='fp-sec'><div class='fp-h'>이미지 ("+imgs.length+")</div>";
       for(var i=0;i<imgs.length;i++){var f=imgs[i],
-        st=f.status==="ok"?["st-ok","✓ 사용가능"]:f.status==="missing"?["st-bad","✗ 식별안됨"]:["st-mut",""],
-        inPool=window.__drop&&Object.prototype.hasOwnProperty.call(window.__drop,f.name);
-        h+="<div class='fp-row' title='"+esc(f.name)+"'><span class='fp-ico'>🖼️</span><span class='fp-name'>"+esc(f.name)+"</span><span class='fp-st "+st[0]+"'>"+st[1]+"</span><button class='fp-ins-btn' type='button' data-ins='"+esc(f.name)+"' title='커서 위치에 삽입: "+esc(f.name)+"'>삽입</button>"+(inPool?"<button class='fp-del-btn' type='button' data-del='"+esc(f.name)+"' title='목록에서 제거: "+esc(f.name)+"' aria-label='삭제'>✕</button>":"<span class='fp-del-ph'></span>")+"</div>";}
+        st=f.status==="ok"?["st-ok","✓ 사용중"]:f.status==="missing"?["st-bad","✗ 식별안됨"]:["st-ok","● 사용가능"],
+        inPool=window.__drop&&Object.prototype.hasOwnProperty.call(window.__drop,f.name),
+        act=f.status==="missing"?"<button class='fp-rm-btn' type='button' data-rm='"+esc(f.name)+"' title='MD에서 이 이미지 참조를 삭제: "+esc(f.name)+"'>참조 삭제</button>":"<button class='fp-ins-btn' type='button' data-ins='"+esc(f.name)+"' title='커서 위치에 삽입: "+esc(f.name)+"'>삽입</button>";
+        h+="<div class='fp-row' title='"+esc(f.name)+"'><span class='fp-ico'>🖼️</span><span class='fp-name'>"+esc(f.name)+"</span><span class='fp-st "+st[0]+"'>"+st[1]+"</span>"+act+(inPool?"<button class='fp-del-btn' type='button' data-del='"+esc(f.name)+"' title='목록에서 제거: "+esc(f.name)+"' aria-label='삭제'>✕</button>":"<span class='fp-del-ph'></span>")+"</div>";}
       h+="</div>";
     }else h+="<div class='fp-sec'><div class='fp-empty'>참조된 이미지 없음</div></div>";
     if(anyMissing)h+="<div class='fp-hint'>식별 안 된 이미지가 있어요. <b>‘파일 열기’</b>로 이미지를 넣거나, <b>이미지</b>(또는 폴더째) 끌어다 놓으면 표시됩니다.</div>";
@@ -633,8 +695,20 @@ window.__resolveLocalImages=async function(src){
   }
   window.__renderFileBadge=build;
   function close(){if(pop)pop.hidden=true;if(badge)badge.classList.remove("on");}
-  /* 배지 클릭 = 열기 전용(닫기는 X로만). 이미 열려 있으면 내용만 갱신. */
-  if(badge)badge.addEventListener("click",function(e){e.stopPropagation();build();if(pop.hidden){pop.hidden=false;badge.classList.add("on");}});
+  /* 배지 클릭 = 토글(열려 있으면 닫기, 닫혀 있으면 내용 갱신 후 열기). */
+  if(badge)badge.addEventListener("click",function(e){e.stopPropagation();if(pop.hidden){build();pop.hidden=false;badge.classList.add("on");}else{close();}});
+  /* 이미지 추가 알림: 배지 초록 깜빡 + 옆에 잠깐 뜨는 툴팁 */
+  window.__flashBadge=function(n){
+    if(!badge)return;
+    badge.classList.remove("flash-added");void badge.offsetWidth;badge.classList.add("flash-added");
+    setTimeout(function(){badge.classList.remove("flash-added");},3600);
+    var editor=document.getElementById("editor");if(!editor)return;
+    var t=document.getElementById("fbToast");
+    if(!t){t=document.createElement("div");t.id="fbToast";editor.appendChild(t);}
+    t.textContent=(n>1?("이미지 "+n+"개가 추가되었습니다"):"이미지가 추가되었습니다");
+    t.classList.remove("show");void t.offsetWidth;t.classList.add("show");
+    clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},1900);
+  };
   /* 팝오버 클릭: X = 닫기 / '삽입' = 참조 삽입(닫지 않음 → 여러 번 연속 삽입 가능) */
   if(pop)pop.addEventListener("click",function(e){
     if(e.target.closest&&e.target.closest(".fp-close")){close();return;}
@@ -642,6 +716,8 @@ window.__resolveLocalImages=async function(src){
     var del=e.target.closest&&e.target.closest(".fp-del-btn");
     if(del){var dn=del.getAttribute("data-del");if(dn&&window.__drop)delete window.__drop[dn];  /* 풀에서 제거 → 재렌더로 목록/상태 갱신(팝오버는 열린 채) */
       var cur=document.getElementById("rawInput");if(typeof renderPreview==="function")renderPreview(cur?cur.value:(window.__lastText||""),true);else if(window.__renderFileBadge)window.__renderFileBadge();return;}
+    var rm=e.target.closest&&e.target.closest(".fp-rm-btn");
+    if(rm){var rn=rm.getAttribute("data-rm");if(rn)removeRefFromMd(rn);return;}
     var btn=e.target.closest&&e.target.closest(".fp-ins-btn");if(!btn)return;var name=btn.getAttribute("data-ins");if(!name)return;
     var alt=name.replace(/\.[a-z0-9]+$/i,"");var dest=/\s/.test(name)?"<"+name+">":name;  /* 공백 포함 파일명은 <>로 감싸야 마크다운이 인식 */
     if(window.__img&&window.__img.insert)window.__img.insert("!["+alt+"]("+dest+")");});
