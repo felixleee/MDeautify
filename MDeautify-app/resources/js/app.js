@@ -436,7 +436,7 @@ setIco();})();
 /* 편집 중엔 왼쪽 미러(색상 강조)만 즉시 갱신하고, 무거운 미리보기 재생성은 입력을 멈춘 뒤 3초 후 1회만 실행
    → 타이핑 중 오른쪽 미리보기가 자주 재분할되며 깜빡이던 문제 방지. */
 var EDIT_DELAY=2000;
-ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);},EDIT_DELAY);});
+ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);},EDIT_DELAY);});
 ta.addEventListener("scroll",function(){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;});})();
 /* 이미지 붙여넣기/드롭 → data URI 로 임베드(방향①). 큰 이미지는 긴 변 기준 자동 다운스케일.
    100% 오프라인·경로 불필요·PDF에 그대로 embed. 편집기 커서 위치에 ![alt](data:...) 삽입. */
@@ -582,6 +582,7 @@ window.__resolveLocalImages=async function(src){
         var nt=before+block+after;ta.value=nt;
         var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function")mirror.innerHTML=hlMd(nt);
         try{ta.selectionStart=ta.selectionEnd=(before+block).length;}catch(e){}
+        if(mirror){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
         renderPreview(nt,true);
       }else{
         renderPreview(ta?ta.value:(window.__lastText||""),true);
@@ -669,7 +670,7 @@ window.__resolveLocalImages=async function(src){
     if(!changed)return;
     out=out.replace(/\n{3,}/g,"\n\n");  /* 참조만 있던 줄이 비면서 생긴 과한 빈 줄 정리 */
     ta.value=out;
-    var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function")mirror.innerHTML=hlMd(out);
+    var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function"){mirror.innerHTML=hlMd(out);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
     if(typeof renderPreview==="function")renderPreview(out,true);
   }
   var badge=document.getElementById("fileBadge"),num=document.getElementById("fileBadgeN"),pop=document.getElementById("filePop");
