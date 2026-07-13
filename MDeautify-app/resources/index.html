@@ -131,6 +131,12 @@
           <div class='nm-body' id='nmBody'></div>
         </div>
       </div>
+      <div id='updModal' hidden>
+        <div class='upd-card'>
+          <div class='upd-spin' aria-hidden='true'></div>
+          <div class='upd-msg' id='updMsg'>업데이트 다운로드 중…</div>
+        </div>
+      </div>
       <div id='main'>
         <section id='editor'><pre id='raw' aria-hidden='true'></pre><textarea id='rawInput' spellcheck='false' wrap='soft' placeholder='여기에서 마크다운을 직접 수정할 수 있습니다.'></textarea><button id='fileBadge' type='button' hidden title='불러온 파일 보기'><svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8'/></svg><span id='fileBadgeN'>0</span><span id='fileBadgeWarn' aria-hidden='true' title='식별 안 된 이미지가 있습니다'>!</span></button><div id='filePop' hidden></div></section>
         <div id='splitter'>

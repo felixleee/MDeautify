@@ -890,8 +890,11 @@ window.__resolveLocalImages=async function(src){
   var about=document.getElementById("tmAbout"),verEl=document.getElementById("tmVer"),
       btn=document.getElementById("tmUpd"),box=document.getElementById("tmUpdBox"),msg=document.getElementById("tmUpdMsg"),
       act=document.getElementById("tmUpdAct"),link=document.getElementById("tmUpdLink"),go=document.getElementById("tmUpdGo"),
-      settingsBtn=document.getElementById("btnSettings");
+      settingsBtn=document.getElementById("btnSettings"),
+      updModal=document.getElementById("updModal"),updMsgEl=document.getElementById("updMsg");
   if(!about||!isExe)return;                                  /* 버전/업데이트 정보는 EXE 에서만 */
+  function showUpd(t){if(updMsgEl)updMsgEl.textContent=t;if(updModal)updModal.hidden=false;}
+  function hideUpd(){if(updModal)updModal.hidden=true;}
   var CUR=window.NL_APPVERSION?String(window.NL_APPVERSION):"";
   about.hidden=false;if(verEl)verEl.textContent=CUR||"—";
 
@@ -901,12 +904,12 @@ window.__resolveLocalImages=async function(src){
   function hideAct(){if(act)act.hidden=true;}
   if(link)link.addEventListener("click",function(){var t=(latest&&latest.tag)||CUR;if(window.__showReleaseNotes)window.__showReleaseNotes(t);});
 
-  var latest=null;   /* {tag, exeUrl, shaUrl, notesUrl} */
+  var latest=null;   /* {tag, exeUrl, shaUrl, size, notesUrl} */
   function fetchLatest(){
     return fetch("https://api.github.com/repos/"+REPO+"/releases/latest",{headers:{"Accept":"application/vnd.github+json"}})
       .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
-      .then(function(j){var a=(j.assets||[]),exeUrl=null,shaUrl=null;for(var i=0;i<a.length;i++){if(a[i].name===EXE)exeUrl=a[i].browser_download_url;else if(a[i].name===EXE+".sha256")shaUrl=a[i].browser_download_url;}
-        return {tag:(j.tag_name||"").replace(/^v/i,""),exeUrl:exeUrl,shaUrl:shaUrl,notesUrl:j.html_url};});
+      .then(function(j){var a=(j.assets||[]),exeUrl=null,shaUrl=null,size=0;for(var i=0;i<a.length;i++){if(a[i].name===EXE){exeUrl=a[i].browser_download_url;size=a[i].size||0;}else if(a[i].name===EXE+".sha256")shaUrl=a[i].browser_download_url;}
+        return {tag:(j.tag_name||"").replace(/^v/i,""),exeUrl:exeUrl,shaUrl:shaUrl,size:size,notesUrl:j.html_url};});
   }
   function check(auto){
     if(btn)btn.disabled=true;if(!auto)setMsg("","확인 중…");
@@ -934,14 +937,18 @@ window.__resolveLocalImages=async function(src){
       "function Relaunch(){ try{ if(Test-Path $target){ Start-Process -FilePath $target } }catch{} }",   /* 실패 시 원본(교체 전 온전한 exe) 재실행 → 앱이 닫힌 채 남지 않게 */
       "$tmp=Join-Path $env:TEMP 'mdeautify-update'",
       "New-Item -ItemType Directory -Force $tmp | Out-Null",
+      "$status=Join-Path $tmp 'status.txt'",
+      "Remove-Item $status -Force -ErrorAction SilentlyContinue",   /* 이전 실행의 status 제거(앱이 stale 읽지 않게) */
       "$dl=Join-Path $tmp 'MDeautify.new.exe'",
-      "try{ Invoke-WebRequest -Uri $exe -OutFile $dl -UseBasicParsing }catch{ Relaunch; exit 1 }",
+      /* 다운로드/검증 실패는 앱이 아직 살아있으므로 status 만 남기고 종료(Relaunch 불필요) → 앱이 그 자리서 에러 표시 */
+      "try{ Invoke-WebRequest -Uri $exe -OutFile $dl -UseBasicParsing }catch{ Set-Content -LiteralPath $status -Value 'fail:download' -Encoding ascii; exit 1 }",
       "$expected=''",
       /* sha 자산은 GitHub 가 octet-stream 으로 줄 수 있어 .Content 가 Byte[] → 파일로 받아 Get-Content -Raw(문자열)로 읽어 파싱 */
       "if($sha){ try{ $sf=Join-Path $tmp 'MDeautify.sha'; Invoke-WebRequest -Uri $sha -OutFile $sf -UseBasicParsing; $c=Get-Content $sf -Raw; $expected=(($c -replace '[^0-9A-Fa-f]','')).Substring(0,64).ToLower() }catch{ $expected='' } }",
       "$actual=(Get-FileHash $dl -Algorithm SHA256).Hash.ToLower()",
-      "if($expected -and ($actual -ne $expected)){ Remove-Item $dl -Force; Relaunch; exit 2 }",
+      "if($expected -and ($actual -ne $expected)){ Remove-Item $dl -Force; Set-Content -LiteralPath $status -Value 'fail:verify' -Encoding ascii; exit 2 }",
       "Unblock-File $dl",
+      "Set-Content -LiteralPath $status -Value 'downloaded' -Encoding ascii",   /* 앱이 이걸 보고 '설치 중' 표시 후 종료 → 아래 교체 진행 */
       "$dir=[IO.Path]::GetDirectoryName($target)",
       "$bakName=[IO.Path]::GetFileName($target)+'.bak'",
       "$bak=Join-Path $dir $bakName",
@@ -953,22 +960,53 @@ window.__resolveLocalImages=async function(src){
       "Start-Process -FilePath $target"
     ].join("\r\n");
   }
+  /* status.txt 폴링: 다운로드 동안 앱은 열린 채 진행률 표시.
+     'downloaded' → '설치 중' 표시 후 앱 종료(잠금 해제) → 헬퍼가 교체+재실행. 'fail:*' → 앱 유지+에러. */
+  function poll(statusPath,dlPath,total){
+    var tries=0,MAX=600;   /* 600 * 500ms = 5분 */
+    var t=setInterval(function(){
+      tries++;
+      Neutralino.filesystem.readFile(statusPath).then(function(s){
+        s=String(s||"").trim();
+        if(s.indexOf("downloaded")===0){
+          clearInterval(t);showUpd("설치 중… 곧 재시작됩니다");
+          setTimeout(function(){try{Neutralino.app.exit();}catch(e){}},600);   /* 종료 → 헬퍼가 교체+재실행 */
+        }else if(s.indexOf("fail")===0){
+          clearInterval(t);hideUpd();if(go)go.disabled=false;
+          var code=(s.split(":")[1]||"").trim();
+          var why=code==="download"?"다운로드에 실패했어요.":code==="verify"?"파일 검증(SHA256)에 실패했어요.":"업데이트에 실패했어요.";
+          if(window.__appAlert)window.__appAlert(why+" 앱은 그대로 유지됩니다.","업데이트 실패");
+        }
+      }).catch(function(){
+        /* status 없음 = 다운로드 진행 중 → 파일 크기로 대략 % */
+        Neutralino.filesystem.getStats(dlPath).then(function(st){
+          if(total>0){var pct=Math.min(99,Math.floor((st.size/total)*100));showUpd("업데이트 다운로드 중… "+pct+"%");}
+          else showUpd("업데이트 다운로드 중…");
+        }).catch(function(){showUpd("업데이트 다운로드 중…");});
+      });
+      if(tries>=MAX){clearInterval(t);hideUpd();if(go)go.disabled=false;if(window.__appAlert)window.__appAlert("업데이트 시간이 초과되었습니다. 앱은 그대로 유지됩니다.","업데이트 실패");}
+    },500);
+  }
   function install(){
     if(!latest||!latest.tag){setMsg("bad","릴리스 정보를 확인하지 못했어요.");return;}
     if(!verGt(latest.tag,CUR)){setMsg("ok","이미 최신 버전입니다. (v"+CUR+")");hideAct();if(settingsBtn)settingsBtn.classList.remove("has-update");return;}  /* 최신이면 설치 실행 안 함(안전장치) */
     if(!latest.exeUrl){setMsg("bad","설치할 exe 자산이 없습니다.");return;}
     var base=String(window.NL_PATH||"").replace(/[\\/]+$/,"");
     if(!base){setMsg("bad","앱 경로를 확인하지 못했어요.");return;}
-    var target=base+"\\"+EXE;
-    if(go)go.disabled=true;setMsg("warn","다운로드·설치 준비 중… 곧 앱이 재시작됩니다.");
+    var target=base+"\\"+EXE,total=latest.size||0;
+    if(go)go.disabled=true;
     Neutralino.os.getEnv("TEMP").then(function(tmp){
-      var dir=(tmp||base),name="mdeautify-update.ps1",script=buildHelper(latest.exeUrl,latest.shaUrl,target);
+      var dir=(tmp||base),name="mdeautify-update.ps1",updDir=dir+"\\mdeautify-update";
+      var statusPath=updDir+"\\status.txt",dlPath=updDir+"\\MDeautify.new.exe";
+      var script=buildHelper(latest.exeUrl,latest.shaUrl,target);
       return Neutralino.filesystem.writeFile(dir+"\\"+name,script).then(function(){
-        /* 상대 파일명 + cwd 로 실행 → 경로 공백/인용부호 문제 회피. background 로 분리 실행 후 앱 종료. */
+        /* 상대 파일명 + cwd 로 실행(경로 공백/인용부호 회피). 앱은 닫지 않고 다운로드 진행률을 폴링으로 표시. */
         return Neutralino.os.execCommand("powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "+name,{background:true,cwd:dir});
+      }).then(function(){
+        showUpd("업데이트 다운로드 중…");
+        poll(statusPath,dlPath,total);
       });
-    }).then(function(){setTimeout(function(){try{Neutralino.app.exit();}catch(e){}},500);})
-      .catch(function(e){if(go)go.disabled=false;setMsg("bad","설치 시작 실패: "+((e&&e.message)||e));});
+    }).catch(function(e){hideUpd();if(go)go.disabled=false;if(window.__appAlert)window.__appAlert("설치 시작 실패: "+((e&&e.message)||e),"오류");});
   }
 
   if(btn)btn.addEventListener("click",function(){check(false);});
