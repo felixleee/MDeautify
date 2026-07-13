@@ -852,6 +852,31 @@ window.__resolveLocalImages=async function(src){
   var x=document.getElementById("stClose");if(x)x.addEventListener("click",close);
   document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!modal.hidden)close();});
 })();
+/* ===== 릴리스 노트 모달 (GitHub 릴리스 body 를 marked 로 렌더) =====
+   __showReleaseNotes(tag): 수동(즉시 열고 로딩→채움/에러). __showReleaseNotesAuto(tag): 자동(성공 시에만 표시). */
+(function(){
+  var REPO="felixleee/MDeautify";
+  var modal=document.getElementById("notesModal"),titleEl=document.getElementById("nmTitle"),bodyEl=document.getElementById("nmBody"),closeBtn=document.getElementById("nmClose");
+  if(!modal)return;
+  function close(){modal.hidden=true;}
+  if(closeBtn)closeBtn.addEventListener("click",close);
+  modal.addEventListener("click",function(e){if(e.target===modal)close();});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!modal.hidden)close();});
+  function fetchNotes(tag){
+    tag=String(tag||"").replace(/^v/i,"");
+    return fetch("https://api.github.com/repos/"+REPO+"/releases/tags/v"+tag,{headers:{"Accept":"application/vnd.github+json"}})
+      .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+      .then(function(j){return {name:j.name||("MDeautify v"+tag),html:(j.body&&typeof marked!=="undefined")?marked.parse(j.body):""};});
+  }
+  function render(name,html){if(titleEl)titleEl.textContent=name||"릴리스 노트";if(bodyEl){bodyEl.innerHTML=html||"<p class='nm-loading'>릴리스 노트가 없습니다.</p>";bodyEl.scrollTop=0;}modal.hidden=false;}
+  window.__showReleaseNotes=function(tag){
+    if(titleEl)titleEl.textContent="릴리스 노트";if(bodyEl)bodyEl.innerHTML="<p class='nm-loading'>불러오는 중…</p>";modal.hidden=false;
+    return fetchNotes(tag).then(function(n){render(n.name,n.html);}).catch(function(){if(bodyEl)bodyEl.innerHTML="<p class='nm-err'>릴리스 노트를 불러오지 못했어요.</p>";});
+  };
+  window.__showReleaseNotesAuto=function(tag){
+    return fetchNotes(tag).then(function(n){if(n.html)render(n.name,n.html);}).catch(function(){});
+  };
+})();
 /* ===== 자동 업데이트 (EXE 전용) =====
    확인: GitHub API(CORS 허용)로 최신 릴리스 tag 를 현재 버전(NL_APPVERSION)과 비교.
    설치: exe+sha256 다운로드 URL·대상 경로를 담은 PowerShell 헬퍼를 temp 에 쓰고 백그라운드 실행 → app.exit().
@@ -870,8 +895,9 @@ window.__resolveLocalImages=async function(src){
 
   function verGt(a,b){a=String(a).replace(/^v/i,"").split(".");b=String(b).replace(/^v/i,"").split(".");for(var i=0;i<3;i++){var x=parseInt(a[i]||0,10),y=parseInt(b[i]||0,10);if(x>y)return true;if(x<y)return false;}return false;}
   function setMsg(cls,html){if(!box||!msg)return;box.hidden=false;msg.className="tm-upd-msg"+(cls?" "+cls:"");msg.innerHTML=html;}
-  function showAct(url){if(act)act.hidden=false;if(link)link.href=url||("https://github.com/"+REPO+"/releases");}
+  function showAct(){if(act)act.hidden=false;}   /* '릴리스 노트'는 새 창 대신 인-앱 모달로(아래 링크 클릭) */
   function hideAct(){if(act)act.hidden=true;}
+  if(link)link.addEventListener("click",function(){var t=(latest&&latest.tag)||CUR;if(window.__showReleaseNotes)window.__showReleaseNotes(t);});
 
   var latest=null;   /* {tag, exeUrl, shaUrl, notesUrl} */
   function fetchLatest(){
@@ -887,8 +913,8 @@ window.__resolveLocalImages=async function(src){
       if(!info.tag){if(!auto)setMsg("bad","릴리스 정보를 읽지 못했어요.");return false;}
       if(verGt(info.tag,CUR)){
         if(settingsBtn)settingsBtn.classList.add("has-update");
-        if(!info.exeUrl){setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있지만 자동 설치용 exe가 없어요. 릴리스에서 직접 받아 주세요.");showAct(info.notesUrl);if(go)go.style.display="none";return true;}
-        setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있습니다. (현재 v"+CUR+")");showAct(info.notesUrl);if(go)go.style.display="";return true;
+        if(!info.exeUrl){setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있지만 자동 설치용 exe가 없어요. 릴리스에서 직접 받아 주세요.");showAct();if(go)go.style.display="none";return true;}
+        setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있습니다. (현재 v"+CUR+")");showAct();if(go)go.style.display="";return true;
       }
       if(settingsBtn)settingsBtn.classList.remove("has-update");hideAct();
       if(!auto)setMsg("ok","최신 버전입니다. (v"+CUR+")");
@@ -924,7 +950,9 @@ window.__resolveLocalImages=async function(src){
     ].join("\r\n");
   }
   function install(){
-    if(!latest||!latest.exeUrl){setMsg("bad","설치할 exe 자산이 없습니다.");return;}
+    if(!latest||!latest.tag){setMsg("bad","릴리스 정보를 확인하지 못했어요.");return;}
+    if(!verGt(latest.tag,CUR)){setMsg("ok","이미 최신 버전입니다. (v"+CUR+")");hideAct();if(settingsBtn)settingsBtn.classList.remove("has-update");return;}  /* 최신이면 설치 실행 안 함(안전장치) */
+    if(!latest.exeUrl){setMsg("bad","설치할 exe 자산이 없습니다.");return;}
     var base=String(window.NL_PATH||"").replace(/[\\/]+$/,"");
     if(!base){setMsg("bad","앱 경로를 확인하지 못했어요.");return;}
     var target=base+"\\"+EXE;
@@ -942,4 +970,18 @@ window.__resolveLocalImages=async function(src){
   if(btn)btn.addEventListener("click",function(){check(false);});
   if(go)go.addEventListener("click",install);
   setTimeout(function(){check(true);},2500);   /* 시작 후 조용히 1회 확인 → 새 버전이면 설정 버튼에 점 표시 */
+
+  /* 업데이트 후 첫 실행이면 릴리스 노트 모달 자동 표시.
+     seen 버전은 md2pdf_ 접두 키라 %APPDATA%\MDeautify\settings.json 에 영속(exe 교체에도 유지).
+     포트 자동(0)이라 localStorage 는 매 실행 비어 시작 → 설정 파일 하이드레이션(settings-ready) 후에 판정.
+     '업그레이드'만 표시(첫 설치 제외): seen 이 현재와 다르거나(seen 존재), seen 은 없지만 기존 설정키가 있으면(=이전 사용자) 표시. */
+  function seenCheck(){
+    if(!CUR)return;
+    var seen=null;try{seen=localStorage.getItem("md2pdf_seen_version");}catch(e){}
+    var hadSettings=false;try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf("md2pdf_")===0&&k!=="md2pdf_seen_version"){hadSettings=true;break;}}}catch(e){}
+    var upgraded=(seen&&seen!==CUR)||(!seen&&hadSettings);
+    if(upgraded&&window.__showReleaseNotesAuto)window.__showReleaseNotesAuto(CUR);
+    if(seen!==CUR){try{localStorage.setItem("md2pdf_seen_version",CUR);}catch(e){}}
+  }
+  document.addEventListener("md2pdf:settings-ready",seenCheck);
 })();

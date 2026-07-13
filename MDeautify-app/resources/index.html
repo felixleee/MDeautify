@@ -115,11 +115,20 @@
             <div class='tm-upd' id='tmUpdBox' hidden>
               <div class='tm-upd-msg' id='tmUpdMsg'></div>
               <div class='tm-upd-act' id='tmUpdAct' hidden>
-                <a href='#' id='tmUpdLink' target='_blank' rel='noopener'>릴리스 노트</a>
+                <button type='button' id='tmUpdLink' class='tm-upd-link'>릴리스 노트</button>
                 <button type='button' id='tmUpdGo'>지금 설치 후 재시작</button>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+      <div id='notesModal' hidden>
+        <div class='nm-card' role='dialog' aria-modal='true' aria-labelledby='nmTitle'>
+          <div class='nm-head'>
+            <span class='nm-title' id='nmTitle'>릴리스 노트</span>
+            <button class='tm-close' id='nmClose' title='닫기'>×</button>
+          </div>
+          <div class='nm-body' id='nmBody'></div>
         </div>
       </div>
       <div id='main'>

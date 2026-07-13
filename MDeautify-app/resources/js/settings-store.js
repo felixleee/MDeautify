@@ -56,6 +56,7 @@
       }
     }catch(e){}
     ready=true;   /* 이제부터 사용자의 설정 변경이 파일로 저장됨 */
+    try{document.dispatchEvent(new Event("md2pdf:settings-ready"));}catch(e){}  /* 하이드레이션 완료(파일 유무 무관) 신호 — seen 버전 판정 등에서 사용 */
     done();       /* 테마 확정 완료 → 스플래시 제거 */
   })();
 })();

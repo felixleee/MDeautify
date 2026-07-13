@@ -70,7 +70,7 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 .tm-upd-msg.bad{color:var(--st-bad);}
 .tm-upd-msg b{color:var(--tm-fg);font-weight:800;}
 .tm-upd-act{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;}
-#tmUpdLink{font-size:11px;color:var(--ui-brand-accent);text-decoration:none;}
+#tmUpdLink{border:0;background:none;padding:0;font:inherit;font-size:11px;color:var(--ui-brand-accent);text-decoration:none;cursor:pointer;}
 #tmUpdLink:hover{text-decoration:underline;}
 #tmUpdGo{flex:0 0 auto;border:0;background:var(--ui-brand-accent);color:#fff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:6px;cursor:pointer;}
 #tmUpdGo:hover{filter:brightness(1.06);}
@@ -169,6 +169,23 @@ body.loaded #fileBadge{display:inline-flex;}
 #appModal .am-ok:focus-visible{outline:2px solid var(--ui-brand-accent);outline-offset:2px;}
 #appModal .am-danger{border-color:#dc2626;background:#dc2626;}
 #appModal .am-danger:hover{background:#b91c1c;}
+/* 릴리스 노트 모달 (중앙 오버레이 + 스크롤) */
+#notesModal{position:fixed;inset:0;z-index:210;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,17,26,.44);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
+#notesModal[hidden]{display:none;}
+#notesModal .nm-card{background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.4);width:520px;max-width:calc(100vw - 48px);max-height:calc(100vh - 96px);display:flex;flex-direction:column;overflow:hidden;}
+#notesModal .nm-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 18px;border-bottom:1px solid var(--tm-border);flex:0 0 auto;}
+#notesModal .nm-title{font-size:15px;font-weight:800;color:var(--tm-fg);}
+#notesModal .nm-body{padding:14px 20px 18px;overflow-y:auto;font-size:13px;line-height:1.6;color:var(--tm-fg2);}
+#notesModal .nm-body>:first-child{margin-top:0;}
+#notesModal .nm-body h1,#notesModal .nm-body h2{font-size:15px;font-weight:800;color:var(--tm-fg);margin:2px 0 10px;padding:0;border:0;}
+#notesModal .nm-body h3{font-size:12.5px;font-weight:800;color:var(--ui-brand-accent);margin:15px 0 6px;text-transform:none;letter-spacing:0;}
+#notesModal .nm-body ul{margin:6px 0;padding-left:20px;}
+#notesModal .nm-body li{margin:3px 0;}
+#notesModal .nm-body p{margin:6px 0;}
+#notesModal .nm-body code{font-family:var(--mono,ui-monospace,Consolas,monospace);font-size:.9em;background:var(--tm-hover-bg);padding:1px 5px;border-radius:4px;}
+#notesModal .nm-body a{color:var(--ui-brand-accent);}
+#notesModal .nm-body hr{border:0;border-top:1px solid var(--tm-border);margin:12px 0;}
+#notesModal .nm-loading,#notesModal .nm-err{color:var(--tm-muted);}
 #filePop .fp-sec{margin-top:10px;}
 #filePop .fp-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid color-mix(in srgb,var(--tm-border) 60%,transparent);}
 #filePop .fp-row:first-of-type{border-top:0;}
@@ -286,7 +303,7 @@ body.loaded #fileBadge{display:inline-flex;}
   /* PAGED_CSS에서 새어 나온 @page{margin:18mm 15mm} 무력화 — 물리 여백 0, 여백은 페이지 박스에 이미 포함 */
   @page{size:A4;margin:0 !important;}
   html,body{height:auto;overflow:visible;display:block;background:#fff;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
-  #bar,#editor,#drop,#themeModal,#settingsModal,#splitter{display:none !important;}
+  #bar,#editor,#drop,#themeModal,#settingsModal,#notesModal,#splitter{display:none !important;}
   #main{display:block !important;min-height:0 !important;}
   #viewer{display:block !important;overflow:visible !important;background:#fff !important;}
   .pv-head{display:none !important;}
