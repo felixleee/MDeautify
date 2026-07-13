@@ -34,7 +34,8 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #themeModal .tm-card,#settingsModal .tm-card{background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:320px;max-width:calc(100vw - 32px);max-height:calc(100vh - 66px);overflow-y:auto;}
 #themeModal .tm-head,#settingsModal .tm-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px;}
 #themeModal .tm-title,#settingsModal .tm-title{font-size:14px;font-weight:700;color:var(--tm-fg);}
-#themeModal .tm-close,#settingsModal .tm-close{border:0;background:none;font-size:18px;line-height:1;color:var(--tm-close);cursor:pointer;padding:2px 4px;}
+#themeModal .tm-close,#settingsModal .tm-close,#notesModal .tm-close{border:0;background:none;font-size:18px;line-height:1;color:var(--tm-close);cursor:pointer;padding:2px 4px;}
+#notesModal .tm-close:hover{color:var(--tm-fg);}
 /* 설정 모달의 첫 tm-opts 는 헤더 바로 아래 구분선이 어색 → 위 여백/선 제거 */
 #settingsModal .tm-opts{margin-top:0;padding-top:0;border-top:0;}
 #btnSettings{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;}

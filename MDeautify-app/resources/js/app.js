@@ -845,7 +845,9 @@ window.__resolveLocalImages=async function(src){
 (function(){
   var trigger=document.getElementById("btnSettings"),modal=document.getElementById("settingsModal");
   if(!trigger||!modal)return;
-  function open(){modal.hidden=false;var r=trigger.getBoundingClientRect();var w=modal.offsetWidth||300;var left=Math.max(8,Math.min(r.right-w,window.innerWidth-w-8));modal.style.top=(r.bottom+6)+"px";modal.style.left=left+"px";}
+  function open(){modal.hidden=false;var r=trigger.getBoundingClientRect();var w=modal.offsetWidth||300;var left=Math.max(8,Math.min(r.right-w,window.innerWidth-w-8));modal.style.top=(r.bottom+6)+"px";modal.style.left=left+"px";
+    /* 업데이트 대기(점 표시) 중에 톱니를 열면 = '업데이트 확인'을 누른 것처럼 결과를 바로 표시 */
+    if(trigger.classList.contains("has-update")&&window.__updateCheck)window.__updateCheck();}
   function close(){modal.hidden=true;}
   trigger.addEventListener("click",function(e){e.stopPropagation();modal.hidden?open():close();});
   document.addEventListener("click",function(e){if(!modal.hidden&&!modal.contains(e.target)&&e.target!==trigger&&!trigger.contains(e.target))close();});
@@ -914,10 +916,11 @@ window.__resolveLocalImages=async function(src){
       if(verGt(info.tag,CUR)){
         if(settingsBtn)settingsBtn.classList.add("has-update");
         if(!info.exeUrl){setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있지만 자동 설치용 exe가 없어요. 릴리스에서 직접 받아 주세요.");showAct();if(go)go.style.display="none";return true;}
-        setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있습니다. (현재 v"+CUR+")");showAct();if(go)go.style.display="";return true;
+        setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있습니다. (현재 v"+CUR+")");showAct();if(go){go.style.display="";go.disabled=false;}return true;   /* 새 버전 → 설치 버튼 활성 */
       }
-      if(settingsBtn)settingsBtn.classList.remove("has-update");hideAct();
-      if(!auto)setMsg("ok","최신 버전입니다. (v"+CUR+")");
+      if(settingsBtn)settingsBtn.classList.remove("has-update");
+      if(!auto){setMsg("ok","최신 버전입니다. (v"+CUR+")");showAct();if(go){go.style.display="";go.disabled=true;}}  /* 같은 버전 → 버튼은 두되 비활성화 */
+      else hideAct();
       return false;
     }).catch(function(e){if(btn)btn.disabled=false;if(!auto)setMsg("bad","업데이트 확인 실패: "+((e&&e.message)||e));return false;});
   }
@@ -969,6 +972,7 @@ window.__resolveLocalImages=async function(src){
 
   if(btn)btn.addEventListener("click",function(){check(false);});
   if(go)go.addEventListener("click",install);
+  window.__updateCheck=function(){return check(false);};   /* 톱니 열 때 '업데이트 확인'을 대신 눌러줌 */
   setTimeout(function(){check(true);},2500);   /* 시작 후 조용히 1회 확인 → 새 버전이면 설정 버튼에 점 표시 */
 
   /* 업데이트 후 첫 실행이면 릴리스 노트 모달 자동 표시.
