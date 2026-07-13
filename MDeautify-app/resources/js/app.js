@@ -896,7 +896,8 @@ window.__resolveLocalImages=async function(src){
       "$dl=Join-Path $tmp 'MDeautify.new.exe'",
       "try{ Invoke-WebRequest -Uri $exe -OutFile $dl -UseBasicParsing }catch{ exit 1 }",
       "$expected=''",
-      "if($sha){ try{ $c=(Invoke-WebRequest -Uri $sha -UseBasicParsing).Content; $expected=(($c -replace '[^0-9A-Fa-f]','')).Substring(0,64).ToLower() }catch{ $expected='' } }",
+      /* sha 자산은 GitHub 가 octet-stream 으로 줄 수 있어 .Content 가 Byte[] → 파일로 받아 Get-Content -Raw(문자열)로 읽어 파싱 */
+      "if($sha){ try{ $sf=Join-Path $tmp 'MDeautify.sha'; Invoke-WebRequest -Uri $sha -OutFile $sf -UseBasicParsing; $c=Get-Content $sf -Raw; $expected=(($c -replace '[^0-9A-Fa-f]','')).Substring(0,64).ToLower() }catch{ $expected='' } }",
       "$actual=(Get-FileHash $dl -Algorithm SHA256).Hash.ToLower()",
       "if($expected -and ($actual -ne $expected)){ Remove-Item $dl -Force; exit 2 }",
       "Unblock-File $dl",
