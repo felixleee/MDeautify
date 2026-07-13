@@ -31,7 +31,7 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #btnReset:hover{background:color-mix(in srgb, var(--ui-bar-fg) 14%, transparent) !important;opacity:1;}
 #themeModal{position:fixed;z-index:50;}
 #themeModal[hidden]{display:none;}
-#themeModal .tm-card{background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:320px;max-width:calc(100vw - 32px);}
+#themeModal .tm-card{background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:320px;max-width:calc(100vw - 32px);max-height:calc(100vh - 66px);overflow-y:auto;}
 #themeModal .tm-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px;}
 #themeModal .tm-title{font-size:14px;font-weight:700;color:var(--tm-fg);}
 #themeModal .tm-close{border:0;background:none;font-size:18px;line-height:1;color:var(--tm-close);cursor:pointer;padding:2px 4px;}
