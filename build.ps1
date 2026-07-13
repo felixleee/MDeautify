@@ -59,6 +59,14 @@ if ($doExe) {
     Write-Host "[EXE] rcedit 없음 → 버전 리소스 패치 건너뜀 (tools\rcedit-x64.exe)" -ForegroundColor Yellow
   }
   Write-Host "[EXE] release\MDeautify.exe (단일 파일, 리소스 내장) 생성" -ForegroundColor Green
+
+  # ★ SHA256 체크섬 생성 (반드시 rcedit 패치 '이후' 최종 exe 기준). 자동 업데이트 무결성 검증용.
+  #   릴리스에 MDeautify.exe 와 MDeautify.exe.sha256 을 함께 올리면, 업데이터가 다운로드 후 해시를 검증함.
+  $hash = (Get-FileHash $outExe -Algorithm SHA256).Hash.ToLower()
+  $shaPath = "$outExe.sha256"
+  # 형식: "<hash>  MDeautify.exe" (sha256sum 호환)
+  Set-Content -Path $shaPath -Value "$hash  MDeautify.exe" -NoNewline -Encoding ascii
+  Write-Host "[EXE] release\MDeautify.exe.sha256 = $hash" -ForegroundColor DarkGray
 }
 
 Write-Host ""

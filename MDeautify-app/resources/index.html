@@ -92,6 +92,20 @@
               <input type='checkbox' id='tmRemember' class='tm-switch'>
             </div>
           </div>
+          <div class='tm-about' id='tmAbout' hidden>
+            <div class='tm-sec-head'><span class='tm-sec-title'>정보 · 업데이트</span></div>
+            <div class='tm-about-row'>
+              <span class='tm-ver'>현재 버전 <b id='tmVer'>—</b></span>
+              <button type='button' id='tmUpd'>업데이트 확인</button>
+            </div>
+            <div class='tm-upd' id='tmUpdBox' hidden>
+              <div class='tm-upd-msg' id='tmUpdMsg'></div>
+              <div class='tm-upd-act' id='tmUpdAct' hidden>
+                <a href='#' id='tmUpdLink' target='_blank' rel='noopener'>릴리스 노트</a>
+                <button type='button' id='tmUpdGo'>지금 설치 후 재시작</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div id='main'>

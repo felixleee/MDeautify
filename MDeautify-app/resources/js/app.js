@@ -12,7 +12,7 @@ l=l.replace(/(`[^`]+`)/g,'<span class="mc">$1</span>');
 l=l.replace(/(\*\*[^*]+\*\*)/g,'<span class="mb">$1</span>');
 l=l.replace(/(\[[^\]]+\]\([^)]+\))/g,'<span class="mlk">$1</span>');
 }
-return '<span class="ln" data-ln="'+i+'">'+l+'</span>';}).join("\n");}
+return '<span class="ln" data-ln="'+i+'">'+(l||'​')+'</span>';}).join("\n");}  /* 빈 줄엔 zero-width space: div의 trailing 빈 줄이 높이0으로 접혀 textarea보다 1줄 짧아지던 것 보정(최하단 커서 정합) */
 function fixLooseLists(t){var lines=t.split("\n"),out=[];var isItem=function(s){return /^\s*([-*+]|\d+\.)\s+/.test(s);};
 for(var i=0;i<lines.length;i++){if(isItem(lines[i])){var p=out.length?out[out.length-1]:"";if(p.trim()&&!isItem(p))out.push("");}out.push(lines[i]);}return out.join("\n");}
 /* fixLooseLists 와 동일하되, 결과 각 줄이 원본(body) 몇 번째 줄에서 왔는지 map 을 함께 반환.
@@ -234,29 +234,57 @@ document.getElementById("viewer").scrollTop=0;
 function runPaged(src,keepScroll){
   var pages=document.getElementById("pages");
   var viewer=document.getElementById("viewer");
+  var pvHead=document.querySelector(".pv-head");var headH=pvHead?pvHead.offsetHeight:0;  /* 스티키 헤더에 가린 높이 */
   var vMax=viewer.scrollHeight-viewer.clientHeight;
   var ratio=(keepScroll&&vMax>0)?viewer.scrollTop/vMax:0;
-  function restore(){var m=viewer.scrollHeight-viewer.clientHeight;viewer.scrollTop=keepScroll?ratio*m:0;}
-  pages.innerHTML="";
-  if(!window.PagedModule||!window.PagedModule.Previewer){fallbackRender(src);restore();return;}
+  /* 재분할 전: 뷰어 상단(헤더 바로 아래)에 걸려 있던 소스 블록(data-sl)과 그 오프셋을 기록.
+     → 에디터 스크롤과 무관하게 '보고 있던 그 내용'을 기준으로 복원(비율/에디터앵커보다 안정). */
+  var keepSl=null,keepOff=0;
+  if(keepScroll){
+    var vr0=viewer.getBoundingClientRect();
+    var old=pages.querySelectorAll("[data-sl]");
+    for(var i=0;i<old.length;i++){
+      var rel=old[i].getBoundingClientRect().top-vr0.top-headH;   /* 헤더 아래 기준 뷰어 내 위치 */
+      if(keepSl===null||rel<=0){keepSl=old[i].getAttribute("data-sl");keepOff=rel;}  /* 상단 경계를 지나친(=걸쳐 있는) 마지막 블록 */
+      if(rel>0)break;   /* 첫 '완전히 아래' 블록을 만나면 중단 → 직전 것이 상단 걸침 */
+    }
+  }
+  function restore(){
+    if(keepScroll&&keepSl!==null){
+      var el=pages.querySelector('[data-sl="'+keepSl+'"]');
+      if(el){var vr=viewer.getBoundingClientRect();var abs=el.getBoundingClientRect().top-vr.top+viewer.scrollTop;viewer.scrollTop=Math.max(0,abs-headH-keepOff);return;}
+    }
+    var m=viewer.scrollHeight-viewer.clientHeight;viewer.scrollTop=keepScroll?ratio*m:0;   /* 폴백: 앵커 블록 못 찾으면 비율 */
+  }
+  if(!window.PagedModule||!window.PagedModule.Previewer){pages.innerHTML="";fallbackRender(src);restore();return;}
   var blobUrl=null;try{blobUrl=URL.createObjectURL(new Blob([PAGED_CSS],{type:"text/css"}));}catch(e){}
+  /* 새 조판은 화면 밖 임시 컨테이너에서 완료한 뒤 한 번에 교체 → 편집 중 '기존 내용이 비었다가 다시 채워지는' 깜빡임 제거.
+     교체 전까지 기존 미리보기가 그대로 보이고, 완료 순간 새 내용+스크롤 복원이 같은 프레임에 반영됨.
+     화면 밖(left:-99999px)이라 사용자에게 안 보이지만 정상 레이아웃/측정되어 Paged.js 분할 계산에 영향 없음. */
+  var staging=document.createElement("div");
+  staging.style.cssText="position:absolute;left:-99999px;top:0;width:"+(pages.clientWidth||viewer.clientWidth||800)+"px;";
+  document.body.appendChild(staging);
+  function dropStaging(){if(staging&&staging.parentNode)staging.parentNode.removeChild(staging);staging=null;}
+  function swapIn(){pages.innerHTML="";while(staging.firstChild)pages.appendChild(staging.firstChild);dropStaging();}
+  function fail(err){if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();}
   try{
     var prev=new window.PagedModule.Previewer();
-    prev.preview("<style>"+PAGED_CSS+"</style>"+src.innerHTML, blobUrl?[blobUrl]:[], pages).then(function(flow){
+    prev.preview("<style>"+PAGED_CSS+"</style>"+src.innerHTML, blobUrl?[blobUrl]:[], staging).then(function(flow){
+      swapIn();
       repeatTableHeaders(pages);
       if(typeof applyFooter==="function")applyFooter();
       var n=pages.querySelectorAll(".pagedjs_page").length||((flow&&flow.total)||0);
       setHead("Total "+n+" page"+(n>1?"s":""));
       restore();
-    }).catch(function(err){console.error(err);fallbackRender(src);restore();});
-  }catch(e){console.error(e);fallbackRender(src);restore();}
+    }).catch(fail);
+  }catch(e){fail(e);}
 }
 /* 미리보기만 재생성(에디터 내용은 건드리지 않음). keepScroll=true면 뷰어 스크롤 위치 유지(편집 중 튐 방지) */
 async function renderPreview(text,keepScroll){
 window.__lastText=text;
 var src=buildSource(text);
 document.body.classList.add("loaded");
-setHead("페이지 분할 중...");
+if(!keepScroll)setHead("페이지 분할 중...");   /* 편집 재렌더 땐 기존 'Total N' 유지 → 헤더 깜빡임 방지(내용은 화면 밖에서 조판 후 교체) */
 /* EXE(Neutralino)에서 로컬 이미지 경로(![](example.png))를 .md 폴더 기준으로 읽어 data URI로 치환. 브라우저에선 훅 없음. */
 if(typeof window.__resolveLocalImages==="function"){try{await window.__resolveLocalImages(src);}catch(e){}}
 runPaged(src,keepScroll);
@@ -267,7 +295,7 @@ var ta=document.getElementById("rawInput");if(ta){ta.value=text;ta.scrollTop=0;}
 var mirror=document.getElementById("raw");if(mirror){mirror.innerHTML=hlMd(text);mirror.scrollTop=0;}
 renderPreview(text,false);
 }
-function loadFile(file){window.__lastFile=file;window.__mdDir=null;window.__mdName=file.name||"document";window.__fname=(file.name||"document").replace(/\.(md|markdown|txt)$/i,"");
+function loadFile(file){window.__lastFile=file;window.__mdDir=null;window.__mdPath=null;window.__mdName=file.name||"document";window.__fname=(file.name||"document").replace(/\.(md|markdown|txt)$/i,"");
 var r=new FileReader();r.onload=function(e){renderMarkdown(e.target.result);};r.readAsText(file,"utf-8");}
 /* 이미 문서를 불러온 상태에서 '다른 MD'로 교체하기 전 확인(편집분 유실 경고). 문서가 없으면 바로 진행. */
 window.__confirmReplaceDoc=async function(){
@@ -426,6 +454,7 @@ setIco();})();
     var y=interp(A,fk,tk,q);if(y==null)return;
     if(to===viewer)y=y-h;                                    /* 뷰어가 대상이면: 헤더 바로 아래로 내려 가림 방지 */
     lockUntil=clock()+80;to.scrollTop=Math.max(0,y);
+    if(to===rawInput){mirror.scrollTop=rawInput.scrollTop;mirror.scrollLeft=rawInput.scrollLeft;}  /* 미리보기 스크롤로 편집기가 움직일 때 색상 미러도 즉시 맞춰 커서-글자 정합 유지 */
   });}
   linkFn(rawInput,viewer,"ed","vw");
   linkFn(viewer,rawInput,"vw","ed");
@@ -437,7 +466,86 @@ setIco();})();
    → 타이핑 중 오른쪽 미리보기가 자주 재분할되며 깜빡이던 문제 방지. */
 var EDIT_DELAY=2000;
 ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);},EDIT_DELAY);});
-ta.addEventListener("scroll",function(){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;});})();
+function syncMirror(){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
+ta.addEventListener("scroll",syncMirror);
+/* 커서 이동(방향키·클릭·타이핑)으로 textarea 가 자동 스크롤될 때 'scroll' 이벤트가 누락되는 엔진이 있어
+   미러가 안 따라오고 커서-글자가 어긋남 → selectionchange 로 커서가 움직일 때마다 즉시 정합. */
+document.addEventListener("selectionchange",function(){if(document.activeElement===ta)syncMirror();});
+ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
+/* 최종 안전망: 창이 보이는 동안 rAF 로 매 프레임 정합(값 같으면 no-op). */
+(function syncLoop(){if(mirror.scrollTop!==ta.scrollTop||mirror.scrollLeft!==ta.scrollLeft)syncMirror();requestAnimationFrame(syncLoop);})();})();
+/* ===== Ctrl/Cmd+S: 편집 내용을 원본 .md 에 저장 =====
+   - EXE + 경로 있음(__mdPath: '파일 열기'/더블클릭/연결앱으로 연 경우): 원본에 즉시 덮어쓰기
+   - EXE + 경로 없음(창 안 드롭 = WebView2 한계로 경로 없음): 저장 다이얼로그 1회 → 그 경로를 __mdPath 로 기억 → 이후 즉시 덮어쓰기
+   - 브라우저(NL_PORT 없음): 파일시스템 쓰기 불가 → .md 다운로드로 폴백 */
+(function(){
+  var ta=document.getElementById("rawInput");if(!ta)return;
+  /* 짧은 토스트(이미지 추가 알림 #fbToast 요소·CSS 재사용) */
+  function toast(msg){var editor=document.getElementById("editor");if(!editor)return;var t=document.getElementById("fbToast");if(!t){t=document.createElement("div");t.id="fbToast";editor.appendChild(t);}t.textContent=msg;t.classList.remove("show");void t.offsetWidth;t.classList.add("show");clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},1600);}
+  window.__saveMd=async function(){
+    if(!document.body.classList.contains("loaded"))return;   /* 문서 없으면 무시 */
+    var text=ta.value;
+    var isExe=(typeof window.NL_PORT!=="undefined"&&typeof window.Neutralino!=="undefined");
+    var defName=window.__mdName||((window.__fname||"document")+".md");
+    if(isExe){
+      try{
+        var path=window.__mdPath;
+        if(!path){   /* 드롭 등 경로 미확보 → 저장 위치 1회 지정 */
+          path=await Neutralino.os.showSaveDialog("Markdown 저장",{defaultPath:defName,filters:[{name:"Markdown",extensions:["md","markdown","txt"]},{name:"모든 파일",extensions:["*"]}]});
+          if(!path)return;   /* 취소 */
+          if(!/\.(md|markdown|txt)$/i.test(path))path+=".md";
+          window.__mdPath=path;
+          window.__mdDir=path.replace(/[\\\/][^\\\/]*$/,"");
+          window.__mdName=path.replace(/^.*[\\\/]/,"");
+          window.__fname=window.__mdName.replace(/\.(md|markdown|txt)$/i,"");
+          if(window.__renderFileBadge)window.__renderFileBadge();
+        }
+        await Neutralino.filesystem.writeFile(path,text);
+        toast("저장됨");
+      }catch(e){try{Neutralino.debug.log("[save] "+e);}catch(_){}if(window.__appAlert)window.__appAlert("저장 중 문제가 발생했습니다.","오류");else alert("저장 중 문제가 발생했습니다.");}
+    }else{   /* 브라우저: 다운로드 */
+      try{var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=defName;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);toast("다운로드됨");}catch(e){}
+    }
+  };
+  document.addEventListener("keydown",function(e){
+    if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&(e.key==="s"||e.key==="S")){e.preventDefault();window.__saveMd();}
+  },true);
+})();
+/* ===== md 편집기: Tab / Shift+Tab 들여쓰기 (VSCode 유사) =====
+   - Tab: 커서 위치에 공백 2칸 삽입 / 선택 있으면 대상 줄들 들여쓰기
+   - Shift+Tab: 현재 줄(또는 선택 줄들) 내어쓰기(앞 공백 최대 2칸 또는 탭 1개 제거)
+   - Alt/Ctrl/Meta+Tab 은 가로채지 않음(OS 창 전환 등 유지)
+   - execCommand 로 편집해 네이티브 실행취소(Ctrl+Z) 스택을 보존 */
+(function(){
+  var ta=document.getElementById("rawInput"),mirror=document.getElementById("raw");if(!ta)return;
+  var UNIT="  ";
+  function countNL(s){var n=0,i=0;for(;i<s.length;i++)if(s.charCodeAt(i)===10)n++;return n;}
+  function synced(){if(mirror){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}}
+  ta.addEventListener("keydown",function(e){
+    if(e.key!=="Tab"||e.altKey||e.ctrlKey||e.metaKey)return;   /* Alt/Ctrl/Meta+Tab 은 OS/브라우저에 양보 */
+    e.preventDefault();
+    var val=ta.value,start=ta.selectionStart,end=ta.selectionEnd;
+    if(start===end&&!e.shiftKey){document.execCommand("insertText",false,UNIT);synced();return;}   /* 단순 삽입 */
+    var ls=val.lastIndexOf("\n",start-1)+1;                    /* 첫 줄 시작 오프셋 */
+    var le=val.indexOf("\n",end);if(le<0)le=val.length;        /* 마지막 줄 끝 오프셋 */
+    var lines=val.slice(ls,le).split("\n");
+    if(e.shiftKey){                                            /* 내어쓰기 */
+      var rm0=((lines[0]||"").match(/^( {1,2}|\t)/)||[""])[0].length;
+      lines=lines.map(function(ln){var m=ln.match(/^( {1,2}|\t)/);return m?ln.slice(m[0].length):ln;});
+      var nb=lines.join("\n");
+      ta.setSelectionRange(ls,le);document.execCommand("insertText",false,nb);
+      if(start===end){var np=Math.max(ls,start-rm0);ta.setSelectionRange(np,np);}
+      else ta.setSelectionRange(ls,ls+nb.length);
+    }else{                                                     /* 들여쓰기(선택 줄들) */
+      var uS=1+countNL(val.slice(ls,start)),uE=1+countNL(val.slice(ls,end));
+      lines=lines.map(function(ln){return UNIT+ln;});
+      var nb2=lines.join("\n");
+      ta.setSelectionRange(ls,le);document.execCommand("insertText",false,nb2);
+      ta.setSelectionRange(start+UNIT.length*uS,end+UNIT.length*uE);
+    }
+    synced();
+  });
+})();
 /* 이미지 붙여넣기/드롭 → data URI 로 임베드(방향①). 큰 이미지는 긴 변 기준 자동 다운스케일.
    100% 오프라인·경로 불필요·PDF에 그대로 embed. 편집기 커서 위치에 ![alt](data:...) 삽입. */
 (function(){
@@ -563,7 +671,7 @@ window.__resolveLocalImages=async function(src){
       /* 함께 온 이미지는 기존 풀에 '병합'(문서 전환에도 이전 이미지 목록 유지) */
       window.__drop=window.__drop||{};
       for(var k=0;k<imgs.length;k++){var im=imgs[k];try{var du=await readDataUrl(im);window.__drop[im.name]=await window.__img.encode(du,im.type||mimeByName(im.name));}catch(e){}}
-      window.__mdDir=null;
+      window.__mdDir=null;window.__mdPath=null;   /* 드롭 = 경로 미확보(WebView2 한계). 이전에 연 파일 경로가 남아 엉뚱한 파일을 덮어쓰지 않도록 초기화 */
       var text=await readText(md);
       window.__mdName=md.name;window.__fname=md.name.replace(/\.(md|markdown|txt)$/i,"");
       renderMarkdown(text);
@@ -679,9 +787,18 @@ window.__resolveLocalImages=async function(src){
     if(num)num.textContent=String((md?1:0)+imgs.length);
     var anyMissing=false;for(var mi=0;mi<imgs.length;mi++){if(imgs[mi].status==="missing"){anyMissing=true;break;}}
     if(badge)badge.classList.toggle("has-missing",anyMissing);
+    if(badge)badge.classList.toggle("needs-link",(typeof window.NL_PORT!=="undefined")&&!!md&&!window.__mdPath);  /* EXE에서 경로 없는(드롭) 문서는 배지에 '연결 필요' 표시 */
     if(!pop)return;
     var h="<button type='button' class='fp-close' title='닫기' aria-label='닫기'>✕</button><div class='fp-h fp-h-top'><span>불러온 파일</span><button type='button' class='fp-zip-btn' title='MD와 이미지를 ZIP으로 묶어 저장'>ZIP 저장</button></div>";
-    if(md)h+="<div class='fp-row'><span class='fp-ico'>📄</span><span class='fp-name' title='"+esc(md)+"'>"+esc(md)+"</span></div>";
+    var isExe=(typeof window.NL_PORT!=="undefined"),linked=!!window.__mdPath;
+    if(md){
+      var lk="";
+      if(isExe){lk=linked
+        ?"<span class='fp-link on' title='"+esc(window.__mdPath)+"'>🔗 연결됨</span>"
+        :"<button type='button' class='fp-link-btn' title='이 문서를 저장할 .md 파일 위치를 지정하면 이후 Ctrl+S로 바로 덮어쓰기됩니다'>파일 연결</button>";}
+      h+="<div class='fp-row fp-md-row'><span class='fp-ico'>📄</span><span class='fp-name' title='"+esc(md)+"'>"+esc(md)+"</span>"+(isExe&&!linked?"<span class='fp-link off'>연결 필요</span>":"")+lk+"</div>";
+      if(isExe&&!linked)h+="<div class='fp-hint fp-hint-link'>md를 <b>드래그&드롭</b>으로 열어 저장 위치를 몰라요. <b>Ctrl+S</b>나 <b>‘파일 연결’</b>로 위치를 한 번 지정하면 편집 내용이 원본에 바로 저장됩니다. <b>md 수정 없이 PDF 저장/인쇄만</b> 할 거면 안 해도 돼요.</div>";
+    }
     if(imgs.length){
       h+="<div class='fp-sec'><div class='fp-h'>이미지 ("+imgs.length+")</div>";
       for(var i=0;i<imgs.length;i++){var f=imgs[i],
@@ -714,6 +831,7 @@ window.__resolveLocalImages=async function(src){
   if(pop)pop.addEventListener("click",function(e){
     if(e.target.closest&&e.target.closest(".fp-close")){close();return;}
     if(e.target.closest&&e.target.closest(".fp-zip-btn")){if(window.__exportZip)window.__exportZip();return;}
+    if(e.target.closest&&e.target.closest(".fp-link-btn")){if(window.__saveMd)window.__saveMd();return;}   /* 파일 연결 = 저장 위치 지정(=Ctrl+S 경로없음 경로) → __mdPath 설정 후 배지 갱신 */
     var del=e.target.closest&&e.target.closest(".fp-del-btn");
     if(del){var dn=del.getAttribute("data-del");if(dn&&window.__drop)delete window.__drop[dn];  /* 풀에서 제거 → 재렌더로 목록/상태 갱신(팝오버는 열린 채) */
       var cur=document.getElementById("rawInput");if(typeof renderPreview==="function")renderPreview(cur?cur.value:(window.__lastText||""),true);else if(window.__renderFileBadge)window.__renderFileBadge();return;}
@@ -722,4 +840,94 @@ window.__resolveLocalImages=async function(src){
     var btn=e.target.closest&&e.target.closest(".fp-ins-btn");if(!btn)return;var name=btn.getAttribute("data-ins");if(!name)return;
     var alt=name.replace(/\.[a-z0-9]+$/i,"");var dest=/\s/.test(name)?"<"+name+">":name;  /* 공백 포함 파일명은 <>로 감싸야 마크다운이 인식 */
     if(window.__img&&window.__img.insert)window.__img.insert("!["+alt+"]("+dest+")");});
+})();
+/* ===== 자동 업데이트 (EXE 전용) =====
+   확인: GitHub API(CORS 허용)로 최신 릴리스 tag 를 현재 버전(NL_APPVERSION)과 비교.
+   설치: exe+sha256 다운로드 URL·대상 경로를 담은 PowerShell 헬퍼를 temp 에 쓰고 백그라운드 실행 → app.exit().
+         헬퍼가 네이티브 다운로드 → SHA256 검증 → Unblock-File → (앱 종료로 exe 잠금 풀릴 때까지 대기) → 백업 후 교체 → 재실행.
+   서명 없는 exe 라도 네이티브 다운로드+Unblock-File 로 SmartScreen(MotW)은 대체로 회피(백신 오탐은 서명 전까지 별개 리스크). */
+(function(){
+  var REPO="felixleee/MDeautify",EXE="MDeautify.exe";
+  var isExe=(typeof window.NL_PORT!=="undefined"&&typeof window.Neutralino!=="undefined");
+  var about=document.getElementById("tmAbout"),verEl=document.getElementById("tmVer"),
+      btn=document.getElementById("tmUpd"),box=document.getElementById("tmUpdBox"),msg=document.getElementById("tmUpdMsg"),
+      act=document.getElementById("tmUpdAct"),link=document.getElementById("tmUpdLink"),go=document.getElementById("tmUpdGo"),
+      settingsBtn=document.getElementById("btnTheme");
+  if(!about||!isExe)return;                                  /* 버전/업데이트 정보는 EXE 에서만 */
+  var CUR=window.NL_APPVERSION?String(window.NL_APPVERSION):"";
+  about.hidden=false;if(verEl)verEl.textContent=CUR||"—";
+
+  function verGt(a,b){a=String(a).replace(/^v/i,"").split(".");b=String(b).replace(/^v/i,"").split(".");for(var i=0;i<3;i++){var x=parseInt(a[i]||0,10),y=parseInt(b[i]||0,10);if(x>y)return true;if(x<y)return false;}return false;}
+  function setMsg(cls,html){if(!box||!msg)return;box.hidden=false;msg.className="tm-upd-msg"+(cls?" "+cls:"");msg.innerHTML=html;}
+  function showAct(url){if(act)act.hidden=false;if(link)link.href=url||("https://github.com/"+REPO+"/releases");}
+  function hideAct(){if(act)act.hidden=true;}
+
+  var latest=null;   /* {tag, exeUrl, shaUrl, notesUrl} */
+  function fetchLatest(){
+    return fetch("https://api.github.com/repos/"+REPO+"/releases/latest",{headers:{"Accept":"application/vnd.github+json"}})
+      .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
+      .then(function(j){var a=(j.assets||[]),exeUrl=null,shaUrl=null;for(var i=0;i<a.length;i++){if(a[i].name===EXE)exeUrl=a[i].browser_download_url;else if(a[i].name===EXE+".sha256")shaUrl=a[i].browser_download_url;}
+        return {tag:(j.tag_name||"").replace(/^v/i,""),exeUrl:exeUrl,shaUrl:shaUrl,notesUrl:j.html_url};});
+  }
+  function check(auto){
+    if(btn)btn.disabled=true;if(!auto)setMsg("","확인 중…");
+    return fetchLatest().then(function(info){
+      latest=info;if(btn)btn.disabled=false;
+      if(!info.tag){if(!auto)setMsg("bad","릴리스 정보를 읽지 못했어요.");return false;}
+      if(verGt(info.tag,CUR)){
+        if(settingsBtn)settingsBtn.classList.add("has-update");
+        if(!info.exeUrl){setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있지만 자동 설치용 exe가 없어요. 릴리스에서 직접 받아 주세요.");showAct(info.notesUrl);if(go)go.style.display="none";return true;}
+        setMsg("warn","새 버전 <b>v"+info.tag+"</b> 이 있습니다. (현재 v"+CUR+")");showAct(info.notesUrl);if(go)go.style.display="";return true;
+      }
+      if(settingsBtn)settingsBtn.classList.remove("has-update");hideAct();
+      if(!auto)setMsg("ok","최신 버전입니다. (v"+CUR+")");
+      return false;
+    }).catch(function(e){if(btn)btn.disabled=false;if(!auto)setMsg("bad","업데이트 확인 실패: "+((e&&e.message)||e));return false;});
+  }
+
+  function psQ(s){return "'"+String(s).replace(/'/g,"''")+"'";}   /* PowerShell single-quote escape */
+  function buildHelper(exeUrl,shaUrl,target){
+    return [
+      "$ErrorActionPreference='SilentlyContinue'",
+      "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12",
+      "$exe="+psQ(exeUrl),"$sha="+psQ(shaUrl||""),"$target="+psQ(target),
+      "$tmp=Join-Path $env:TEMP 'mdeautify-update'",
+      "New-Item -ItemType Directory -Force $tmp | Out-Null",
+      "$dl=Join-Path $tmp 'MDeautify.new.exe'",
+      "try{ Invoke-WebRequest -Uri $exe -OutFile $dl -UseBasicParsing }catch{ exit 1 }",
+      "$expected=''",
+      "if($sha){ try{ $c=(Invoke-WebRequest -Uri $sha -UseBasicParsing).Content; $expected=(($c -replace '[^0-9A-Fa-f]','')).Substring(0,64).ToLower() }catch{ $expected='' } }",
+      "$actual=(Get-FileHash $dl -Algorithm SHA256).Hash.ToLower()",
+      "if($expected -and ($actual -ne $expected)){ Remove-Item $dl -Force; exit 2 }",
+      "Unblock-File $dl",
+      "$dir=[IO.Path]::GetDirectoryName($target)",
+      "$bakName=[IO.Path]::GetFileName($target)+'.bak'",
+      "$bak=Join-Path $dir $bakName",
+      "$ok=$false",
+      "for($i=0;$i -lt 120;$i++){ try{ if(Test-Path $bak){Remove-Item $bak -Force}; Rename-Item -LiteralPath $target -NewName $bakName -ErrorAction Stop; Copy-Item $dl $target -Force; $ok=$true; break }catch{ Start-Sleep -Milliseconds 500 } }",
+      "if(-not $ok){ if((Test-Path $bak) -and -not (Test-Path $target)){ Rename-Item -LiteralPath $bak -NewName ([IO.Path]::GetFileName($target)) }; exit 3 }",
+      "Remove-Item $bak -Force -ErrorAction SilentlyContinue",
+      "Remove-Item $dl -Force -ErrorAction SilentlyContinue",
+      "Start-Process -FilePath $target"
+    ].join("\r\n");
+  }
+  function install(){
+    if(!latest||!latest.exeUrl){setMsg("bad","설치할 exe 자산이 없습니다.");return;}
+    var base=String(window.NL_PATH||"").replace(/[\\/]+$/,"");
+    if(!base){setMsg("bad","앱 경로를 확인하지 못했어요.");return;}
+    var target=base+"\\"+EXE;
+    if(go)go.disabled=true;setMsg("warn","다운로드·설치 준비 중… 곧 앱이 재시작됩니다.");
+    Neutralino.os.getEnv("TEMP").then(function(tmp){
+      var dir=(tmp||base),name="mdeautify-update.ps1",script=buildHelper(latest.exeUrl,latest.shaUrl,target);
+      return Neutralino.filesystem.writeFile(dir+"\\"+name,script).then(function(){
+        /* 상대 파일명 + cwd 로 실행 → 경로 공백/인용부호 문제 회피. background 로 분리 실행 후 앱 종료. */
+        return Neutralino.os.execCommand("powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "+name,{background:true,cwd:dir});
+      });
+    }).then(function(){setTimeout(function(){try{Neutralino.app.exit();}catch(e){}},500);})
+      .catch(function(e){if(go)go.disabled=false;setMsg("bad","설치 시작 실패: "+((e&&e.message)||e));});
+  }
+
+  if(btn)btn.addEventListener("click",function(){check(false);});
+  if(go)go.addEventListener("click",install);
+  setTimeout(function(){check(true);},2500);   /* 시작 후 조용히 1회 확인 → 새 버전이면 설정 버튼에 점 표시 */
 })();
