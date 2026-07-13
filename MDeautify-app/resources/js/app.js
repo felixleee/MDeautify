@@ -841,6 +841,17 @@ window.__resolveLocalImages=async function(src){
     var alt=name.replace(/\.[a-z0-9]+$/i,"");var dest=/\s/.test(name)?"<"+name+">":name;  /* 공백 포함 파일명은 <>로 감싸야 마크다운이 인식 */
     if(window.__img&&window.__img.insert)window.__img.insert("!["+alt+"]("+dest+")");});
 })();
+/* ===== 설정(톱니) 모달 열기/닫기 — 시스템 테마 토글 + 업데이트 UI 담음 ===== */
+(function(){
+  var trigger=document.getElementById("btnSettings"),modal=document.getElementById("settingsModal");
+  if(!trigger||!modal)return;
+  function open(){modal.hidden=false;var r=trigger.getBoundingClientRect();var w=modal.offsetWidth||300;var left=Math.max(8,Math.min(r.right-w,window.innerWidth-w-8));modal.style.top=(r.bottom+6)+"px";modal.style.left=left+"px";}
+  function close(){modal.hidden=true;}
+  trigger.addEventListener("click",function(e){e.stopPropagation();modal.hidden?open():close();});
+  document.addEventListener("click",function(e){if(!modal.hidden&&!modal.contains(e.target)&&e.target!==trigger&&!trigger.contains(e.target))close();});
+  var x=document.getElementById("stClose");if(x)x.addEventListener("click",close);
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!modal.hidden)close();});
+})();
 /* ===== 자동 업데이트 (EXE 전용) =====
    확인: GitHub API(CORS 허용)로 최신 릴리스 tag 를 현재 버전(NL_APPVERSION)과 비교.
    설치: exe+sha256 다운로드 URL·대상 경로를 담은 PowerShell 헬퍼를 temp 에 쓰고 백그라운드 실행 → app.exit().
@@ -852,7 +863,7 @@ window.__resolveLocalImages=async function(src){
   var about=document.getElementById("tmAbout"),verEl=document.getElementById("tmVer"),
       btn=document.getElementById("tmUpd"),box=document.getElementById("tmUpdBox"),msg=document.getElementById("tmUpdMsg"),
       act=document.getElementById("tmUpdAct"),link=document.getElementById("tmUpdLink"),go=document.getElementById("tmUpdGo"),
-      settingsBtn=document.getElementById("btnTheme");
+      settingsBtn=document.getElementById("btnSettings");
   if(!about||!isExe)return;                                  /* 버전/업데이트 정보는 EXE 에서만 */
   var CUR=window.NL_APPVERSION?String(window.NL_APPVERSION):"";
   about.hidden=false;if(verEl)verEl.textContent=CUR||"—";

@@ -30,7 +30,7 @@
         <button id='btnOpenTop' title='MD 파일 열기 · 이미지 넣기'>파일 열기</button>
         <button id='btnTheme' title='PDF 설정'>PDF 설정</button>
         <span class='spacer'></span>
-        <label class='mode-sw' title='다크 모드'><span>다크 모드</span><input type='checkbox' id='tmDark' class='tm-switch'></label>
+        <button id='btnSettings' title='설정' aria-label='설정'><svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><circle cx='12' cy='12' r='3'/><path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'/></svg></button>
         <button id='btnPrint' title='인쇄창에서 대상을 “PDF로 저장”으로 선택하세요. “Microsoft Print to PDF”는 링크가 빠집니다.'>PDF 저장/인쇄</button>
         <input id='fileInput' type='file' accept='.md,.markdown,.txt,image/*' multiple style='display:none'>
       </div>
@@ -90,6 +90,20 @@
             <div class='tm-opt'>
               <label for='tmRemember'>선택한 설정 기억하기</label>
               <input type='checkbox' id='tmRemember' class='tm-switch'>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id='settingsModal' hidden>
+        <div class='tm-card'>
+          <div class='tm-head'>
+            <span class='tm-title'>설정</span>
+            <button class='tm-close' id='stClose' title='닫기'>×</button>
+          </div>
+          <div class='tm-opts'>
+            <div class='tm-opt'>
+              <label for='tmDark'>시스템 테마</label>
+              <input type='checkbox' id='tmDark' class='tm-switch'>
             </div>
           </div>
           <div class='tm-about' id='tmAbout' hidden>

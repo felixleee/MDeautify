@@ -29,12 +29,16 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #bar button:not(#btnMode):hover{background:color-mix(in srgb, var(--ui-brand-accent) 16%, transparent);}
 #btnReset{color:var(--ui-bar-fg) !important;border-color:color-mix(in srgb, var(--ui-bar-fg) 40%, transparent) !important;opacity:.9;}
 #btnReset:hover{background:color-mix(in srgb, var(--ui-bar-fg) 14%, transparent) !important;opacity:1;}
-#themeModal{position:fixed;z-index:50;}
-#themeModal[hidden]{display:none;}
-#themeModal .tm-card{background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:320px;max-width:calc(100vw - 32px);max-height:calc(100vh - 66px);overflow-y:auto;}
-#themeModal .tm-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px;}
-#themeModal .tm-title{font-size:14px;font-weight:700;color:var(--tm-fg);}
-#themeModal .tm-close{border:0;background:none;font-size:18px;line-height:1;color:var(--tm-close);cursor:pointer;padding:2px 4px;}
+#themeModal,#settingsModal{position:fixed;z-index:50;}
+#themeModal[hidden],#settingsModal[hidden]{display:none;}
+#themeModal .tm-card,#settingsModal .tm-card{background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:320px;max-width:calc(100vw - 32px);max-height:calc(100vh - 66px);overflow-y:auto;}
+#themeModal .tm-head,#settingsModal .tm-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px;}
+#themeModal .tm-title,#settingsModal .tm-title{font-size:14px;font-weight:700;color:var(--tm-fg);}
+#themeModal .tm-close,#settingsModal .tm-close{border:0;background:none;font-size:18px;line-height:1;color:var(--tm-close);cursor:pointer;padding:2px 4px;}
+/* 설정 모달의 첫 tm-opts 는 헤더 바로 아래 구분선이 어색 → 위 여백/선 제거 */
+#settingsModal .tm-opts{margin-top:0;padding-top:0;border-top:0;}
+#btnSettings{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;}
+#btnSettings svg{display:block;}
 #tm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 #tm-grid button{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--tm-border);border-radius:8px;background:var(--tm-card);cursor:pointer;font:inherit;font-size:12px;color:var(--tm-fg2);text-align:left;}
 #tm-grid button:hover{border-color:var(--tm-bhover);background:var(--tm-hover-bg);}
@@ -72,8 +76,8 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #tmUpdGo:hover{filter:brightness(1.06);}
 #tmUpdGo:disabled{opacity:.6;cursor:default;}
 /* 설정 버튼 업데이트 점 */
-#btnTheme{position:relative;}
-#btnTheme.has-update::after{content:"";position:absolute;top:2px;right:2px;width:7px;height:7px;border-radius:50%;background:var(--st-warn);box-shadow:0 0 0 2px var(--ui-bar-bg);}
+#btnSettings{position:relative;}
+#btnSettings.has-update::after{content:"";position:absolute;top:2px;right:2px;width:7px;height:7px;border-radius:50%;background:var(--st-warn);box-shadow:0 0 0 2px var(--ui-bar-bg);}
 .tm-opt{display:flex;align-items:center;justify-content:space-between;}
 .tm-opt label{font-size:12px;font-weight:700;color:var(--tm-fg2);cursor:pointer;}
 .tm-font{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding:8px 10px;border:1px solid var(--tm-border);border-radius:8px;}
@@ -282,7 +286,7 @@ body.loaded #fileBadge{display:inline-flex;}
   /* PAGED_CSS에서 새어 나온 @page{margin:18mm 15mm} 무력화 — 물리 여백 0, 여백은 페이지 박스에 이미 포함 */
   @page{size:A4;margin:0 !important;}
   html,body{height:auto;overflow:visible;display:block;background:#fff;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
-  #bar,#editor,#drop,#themeModal,#splitter{display:none !important;}
+  #bar,#editor,#drop,#themeModal,#settingsModal,#splitter{display:none !important;}
   #main{display:block !important;min-height:0 !important;}
   #viewer{display:block !important;overflow:visible !important;background:#fff !important;}
   .pv-head{display:none !important;}
