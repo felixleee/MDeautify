@@ -40,6 +40,10 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #settingsModal .tm-opts{margin-top:0;padding-top:0;border-top:0;}
 #btnSettings{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;}
 #btnSettings svg{display:block;}
+/* 설정 톱니: 다른 바 버튼과 달리 그레이·보더 없음(보조 도구 느낌). #bar button#btnSettings 로 :not(#btnMode) 규칙보다 우선. */
+#bar button#btnSettings{border-color:transparent;color:var(--tm-muted);transition:background .12s,color .12s;}
+#bar button#btnSettings:hover{background:color-mix(in srgb,var(--tm-fg2) 12%,transparent);border-color:transparent;color:var(--tm-fg2);}
+#bar button#btnSettings:active{background:color-mix(in srgb,var(--tm-fg2) 18%,transparent);}
 #tm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 #tm-grid button{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--tm-border);border-radius:8px;background:var(--tm-card);cursor:pointer;font:inherit;font-size:12px;color:var(--tm-fg2);text-align:left;}
 #tm-grid button:hover{border-color:var(--tm-bhover);background:var(--tm-hover-bg);}
@@ -148,7 +152,7 @@ body.loaded #drop{display:none;}
 #fileBadge.has-missing{display:inline-flex;opacity:1;border-color:var(--st-bad);color:var(--st-bad);}
 #fileBadge.has-missing #fileBadgeWarn{display:inline-flex;}
 body.loaded #fileBadge{display:inline-flex;}
-#filePop{position:absolute;top:38px;right:14px;z-index:7;width:min(300px,calc(100% - 28px));max-height:calc(100% - 52px);overflow-y:auto;background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,.22);padding:10px 12px;font-size:12.5px;}
+#filePop{position:absolute;top:38px;right:14px;z-index:7;width:min(380px,calc(100% - 28px));max-height:calc(100% - 52px);overflow-y:auto;background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,.22);padding:10px 12px;font-size:12.5px;}
 #filePop .fp-close{position:absolute;top:6px;right:8px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:var(--tm-close);font-size:14px;line-height:1;cursor:pointer;padding:0;}
 #filePop .fp-close:hover{background:var(--tm-hover-bg);color:var(--tm-fg);}
 #filePop .fp-h{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--tm-muted);margin:2px 0 6px;padding-right:20px;}
@@ -186,7 +190,12 @@ body.loaded #fileBadge{display:inline-flex;}
 #notesModal .nm-body code{font-family:var(--mono,ui-monospace,Consolas,monospace);font-size:.9em;background:var(--tm-hover-bg);padding:1px 5px;border-radius:4px;}
 #notesModal .nm-body a{color:var(--ui-brand-accent);}
 #notesModal .nm-body hr{border:0;border-top:1px solid var(--tm-border);margin:12px 0;}
-#notesModal .nm-loading,#notesModal .nm-err{color:var(--tm-muted);}
+#notesModal .nm-loading,#notesModal .nm-err,#notesModal .nm-empty{color:var(--tm-muted);}
+#notesModal .nm-rel+.nm-rel{margin-top:16px;padding-top:16px;border-top:1px solid var(--tm-border);}
+#notesModal .nm-rel-head{display:flex;align-items:baseline;gap:9px;margin:0 0 8px;}
+#notesModal .nm-ver{font-size:15px;font-weight:800;color:var(--tm-fg);}
+#notesModal .nm-date{font-size:11.5px;font-weight:600;color:var(--tm-muted);}
+#notesModal .nm-rel>.nm-rel-head+*{margin-top:0;}
 /* 업데이트 진행 오버레이 */
 #updModal{position:fixed;inset:0;z-index:220;display:flex;align-items:center;justify-content:center;background:rgba(15,17,26,.5);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
 #updModal[hidden]{display:none;}
@@ -227,6 +236,12 @@ body.loaded #fileBadge{display:inline-flex;}
 #filePop .fp-link-btn{flex:0 0 auto;border:1px solid color-mix(in srgb,var(--st-warn) 55%,transparent);background:color-mix(in srgb,var(--st-warn) 14%,transparent);color:var(--st-warn);font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px;line-height:1.35;cursor:pointer;transition:background .12s;}
 #filePop .fp-link-btn:hover{background:color-mix(in srgb,var(--st-warn) 24%,transparent);}
 #filePop .fp-link-btn:active{transform:translateY(1px);}
+#filePop .fp-tip{flex:0 0 auto;font-size:13px;line-height:1;cursor:help;opacity:.85;position:relative;}
+#filePop .fp-tip:hover{opacity:1;}
+#filePop .fp-tip-bubble{position:absolute;top:24px;right:-6px;width:236px;z-index:20;background:var(--tm-card);border:1px solid var(--tm-border);border-left:3px solid var(--st-warn);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.28);padding:9px 11px;font-size:11.5px;font-weight:400;line-height:1.55;color:var(--tm-fg2);text-align:left;white-space:normal;cursor:default;opacity:0;transform:translateY(-4px);pointer-events:none;transition:all .3s ease;}
+#filePop .fp-tip:hover .fp-tip-bubble{opacity:1;transform:translateY(0);}
+#filePop .fp-tip-bubble b{display:block;margin-bottom:3px;color:var(--st-warn);font-weight:700;}
+#filePop .fp-tip-bubble::after{content:"";position:absolute;top:-6px;right:9px;width:10px;height:10px;background:var(--tm-card);border-left:1px solid var(--tm-border);border-top:1px solid var(--tm-border);transform:rotate(45deg);}
 #filePop .fp-hint-link{background:color-mix(in srgb,var(--st-warn) 12%,transparent);border-color:color-mix(in srgb,var(--st-warn) 38%,transparent);}
 #filePop .fp-hint-link code{font-family:var(--mono,ui-monospace,Consolas,monospace);background:color-mix(in srgb,var(--st-warn) 18%,transparent);padding:0 3px;border-radius:3px;}
 #fileBadge.needs-link:not(.has-missing){border-color:color-mix(in srgb,var(--st-warn) 60%,var(--tm-border));color:var(--st-warn);opacity:1;}
@@ -295,6 +310,11 @@ body.loaded #fileBadge{display:inline-flex;}
 .content hr{border:0;border-top:2px solid #e2e8f0;margin:20px 0;}
 /* 링크: 인쇄에서도 강조색 유지 */
 .content a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;}
+/* 섹션 이동(내부 앵커): 앞에 § 마커 + 점선 밑줄 → 문서 안 점프임을 표시 */
+.content a.sec-link{text-decoration-style:dotted;text-underline-offset:3px;}
+.content a.sec-link::before{content:"\A7\A0";font-weight:700;}
+/* 외부 웹 링크: 뒤에 ↗ → 새 탭에서 열림을 표시 */
+.content a.ext-link::after{content:"\A0\2197";font-size:.82em;vertical-align:1px;}
 /* 취소선 */
 .content del{color:#94a3b8;}
 /* GFM 체크박스 목록 */

@@ -49,12 +49,26 @@ if ($doExe) {
   if (Test-Path $rcedit) {
     $cfg = Get-Content (Join-Path $appDir "neutralino.config.json") -Raw | ConvertFrom-Json
     $ver = $cfg.version
-    & $rcedit $outExe `
-      --set-version-string "FileDescription" "MDeautify - Markdown to PDF" `
-      --set-version-string "ProductName" "MDeautify" `
-      --set-file-version "$ver.0" `
-      --set-product-version "$ver" | Out-Null
-    Write-Host "[EXE] 버전 리소스 패치: 설명='MDeautify - Markdown to PDF', 버전=$ver" -ForegroundColor DarkGray
+    # 갓 복사된 exe를 백신 실시간 검사가 잠그면 rcedit 이 'Unable to commit changes'(exit 1)로 실패 →
+    # 짧게 대기하며 최대 5회 재시도. 성공 시 exit 0.
+    $rcOk = $false
+    for ($try = 1; $try -le 5; $try++) {
+      & $rcedit $outExe `
+        --set-version-string "FileDescription" "MDeautify - Markdown to PDF" `
+        --set-version-string "ProductName" "MDeautify" `
+        --set-file-version "$ver.0" `
+        --set-product-version "$ver" 2>$null | Out-Null
+      if ($LASTEXITCODE -eq 0) { $rcOk = $true; break }
+      if ($try -lt 5) {
+        Write-Host "[EXE] rcedit 패치 실패(파일 잠금 추정, exit $LASTEXITCODE) → ${try}/5 재시도 대기..." -ForegroundColor Yellow
+        Start-Sleep -Milliseconds 800
+      }
+    }
+    if ($rcOk) {
+      Write-Host "[EXE] 버전 리소스 패치: 설명='MDeautify - Markdown to PDF', 버전=$ver" -ForegroundColor DarkGray
+    } else {
+      Write-Host "[EXE] 버전 리소스 패치 실패(5회 재시도 소진) — exe 는 유효하나 메타데이터는 기본값. 실행 중 프로세스/백신 확인 후 재빌드 권장." -ForegroundColor Red
+    }
   } else {
     Write-Host "[EXE] rcedit 없음 → 버전 리소스 패치 건너뜀 (tools\rcedit-x64.exe)" -ForegroundColor Yellow
   }

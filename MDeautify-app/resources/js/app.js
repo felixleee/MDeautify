@@ -145,8 +145,18 @@ srcmd=outsideCode(srcmd,function(s){
 });
 var src=document.getElementById("src");
 src.innerHTML=buildCover(meta)+"<div class='content'>"+marked.parse(srcmd)+"</div>";
-/* 링크는 새 탭/새 창으로 열기 */
-src.querySelectorAll(".content a[href]").forEach(function(a){a.setAttribute("target","_blank");a.setAttribute("rel","noopener noreferrer");});
+/* GitHub 스타일 heading 슬러그 id 부여 → 목차 [..](#슬러그) 내부 링크가 해당 섹션으로 스크롤(뷰어 클릭 핸들러). .sn 가공 전 원문 텍스트 기준, 중복 슬러그는 -1,-2 접미(GitHub 동일). */
+(function(){var seen={};src.querySelectorAll(".content h1,.content h2,.content h3,.content h4,.content h5,.content h6").forEach(function(h){
+  if(h.id)return;
+  /* github-slugger 규칙: 소문자화 → 특정 문장부호 집합만 제거(공백은 유지) → 공백을 '개별' 하이픈으로(합치지 않음).
+     예) '내 권한 — 협력사' → em대시 제거 → 공백 2개 → '내-권한--협력사'(하이픈 2개). */
+  var base=(h.textContent||"").trim().toLowerCase().replace(/[ -⁯⸀-⹿’\\'!"#$%&()*+,.\/:;<=>?@\[\]^`{|}~]/g,"").replace(/ /g,"-");
+  if(!base)base="section";
+  var id;if(seen[base]==null){seen[base]=0;id=base;}else{seen[base]++;id=base+"-"+seen[base];}
+  h.id=id;
+});})();
+/* 링크 구분: 내부 앵커(#..)=섹션 이동(sec-link, 뷰어 클릭 핸들러가 처리) / 그 외=외부 웹 링크(ext-link, 새 탭). CSS 가 §·↗ 마커로 시각 구분. */
+src.querySelectorAll(".content a[href]").forEach(function(a){var hv=a.getAttribute("href")||"";if(hv.charAt(0)==="#"){a.classList.add("sec-link");return;}a.classList.add("ext-link");a.setAttribute("target","_blank");a.setAttribute("rel","noopener noreferrer");});
 src.querySelectorAll(".content h1, .content h2, .content h3").forEach(function(h){var m=h.innerHTML.match(/^([A-Z])[.)·]?\s+([\s\S]*)$/);if(m)h.innerHTML="<span class='sn'>"+m[1]+"</span>"+m[2];});
 src.querySelectorAll("code.language-mermaid").forEach(function(c){var pre=c.closest("pre")||c;var kind=window.DIAG?DIAG.detectKind(c.textContent):null;var fig=document.createElement("figure");if(kind){fig.innerHTML=DIAG.render(kind,c.textContent);}else{var type=(c.textContent.trim().split(/\s+/)[0]||"diagram");var box=document.createElement("div");box.className="diag-unsupported";var ti=document.createElement("div");ti.className="du-title";ti.textContent="지원하지 않는 다이어그램: "+type+" (지원: flowchart · erDiagram · sequenceDiagram)";var pp=document.createElement("pre");pp.textContent=c.textContent;box.appendChild(ti);box.appendChild(pp);fig.appendChild(box);}pre.replaceWith(fig);});
 /* 언어 지정 코드블록만 구문 강조(언어 없는 블록=예시는 단색 유지 → 예시/실제 구별됨). mermaid는 위에서 이미 처리됨 */
@@ -405,6 +415,23 @@ window.MD2R=(function(){var K="md2pdf_remember",regs=[];function on(){try{var v=
 document.getElementById("btnPrint").addEventListener("click",function(){if(!document.body.classList.contains("loaded")){if(window.__appAlert)window.__appAlert("먼저 MD 파일을 불러오세요.","변환할 내용이 없어요");else alert("변환된 내용이 없습니다. 먼저 MD 파일을 불러오세요.");return;}window.print();});
 /* 상단 'MD 파일 열기' — 파일 선택 창을 열어 다른 MD 파일 불러오기 */
 var _btnOpenTop=document.getElementById("btnOpenTop");if(_btnOpenTop)_btnOpenTop.addEventListener("click",function(){if(window.__nativeOpen){window.__nativeOpen();return;}var fi=document.getElementById("fileInput");if(fi){fi.value="";fi.click();}});
+/* 목차 등 내부 앵커 링크(#슬러그) 클릭 → 뷰어(#pages) 안에서 해당 heading 으로 부드럽게 스크롤(스티키 헤더 높이만큼 보정). */
+(function(){var viewer=document.getElementById("viewer");if(!viewer)return;
+  viewer.addEventListener("click",function(e){
+    var a=e.target.closest?e.target.closest('a[href^="#"]'):null;if(!a)return;
+    var raw=a.getAttribute("href")||"";if(raw.length<2)return;
+    var id;try{id=decodeURIComponent(raw.slice(1));}catch(_){id=raw.slice(1);}
+    var pages=document.getElementById("pages");if(!pages)return;
+    var tgt=null,all=pages.querySelectorAll("[id]");
+    for(var i=0;i<all.length;i++){if(all[i].id===id){tgt=all[i];break;}}
+    if(!tgt)return;
+    e.preventDefault();
+    var vr=viewer.getBoundingClientRect();
+    var pvHead=document.querySelector(".pv-head");var headH=pvHead?pvHead.offsetHeight:0;
+    var abs=tgt.getBoundingClientRect().top-vr.top+viewer.scrollTop;
+    viewer.scrollTo({top:Math.max(0,abs-headH-8),behavior:"smooth"});
+  });
+})();
 /* MD 원본/미리보기 리사이즈 핸들 + 가운데 접기/펼치기 */
 (function(){var main=document.getElementById("main"),editor=document.getElementById("editor"),sp=document.getElementById("splitter"),fb=document.getElementById("foldBtn");if(!main||!editor||!sp||!fb)return;var ico=fb.querySelector(".fold-ico"),lastBasis="42%",dragging=false;
 function setIco(){ico.textContent=document.body.classList.contains("editor-collapsed")?"›":"‹";}
@@ -796,8 +823,10 @@ window.__resolveLocalImages=async function(src){
       if(isExe){lk=linked
         ?"<span class='fp-link on' title='"+esc(window.__mdPath)+"'>🔗 연결됨</span>"
         :"<button type='button' class='fp-link-btn' title='이 문서를 저장할 .md 파일 위치를 지정하면 이후 Ctrl+S로 바로 덮어쓰기됩니다'>파일 연결</button>";}
-      h+="<div class='fp-row fp-md-row'><span class='fp-ico'>📄</span><span class='fp-name' title='"+esc(md)+"'>"+esc(md)+"</span>"+(isExe&&!linked?"<span class='fp-link off'>연결 필요</span>":"")+lk+"</div>";
-      if(isExe&&!linked)h+="<div class='fp-hint fp-hint-link'>md를 <b>드래그&드롭</b>으로 열어 저장 위치를 몰라요. <b>Ctrl+S</b>나 <b>‘파일 연결’</b>로 위치를 한 번 지정하면 편집 내용이 원본에 바로 저장됩니다. <b>md 수정 없이 PDF 저장/인쇄만</b> 할 거면 안 해도 돼요.</div>";
+      /* '연결 필요' 설명은 인라인 문단 대신 전구(💡) 커스텀 UI 툴팁(hover 시 말풍선, transition)으로 — 팝오버를 가볍게 유지. */
+      var HINT="드래그&드롭으로 열어 저장 위치를 몰라요. Ctrl+S나 ‘파일 연결’로 위치를 한 번 지정하면 편집 내용이 원본에 바로 저장됩니다. PDF 저장·인쇄만 할 거면 안 해도 돼요.";
+      var tip=(isExe&&!linked)?"<span class='fp-tip' role='img' aria-label='도움말: 파일 연결'>💡<span class='fp-tip-bubble'><b>파일 연결이 필요해요</b>"+esc(HINT)+"</span></span>":"";
+      h+="<div class='fp-row fp-md-row'><span class='fp-ico'>📄</span><span class='fp-name' title='"+esc(md)+"'>"+esc(md)+"</span>"+(isExe&&!linked?"<span class='fp-link off'>연결 필요</span>":"")+lk+tip+"</div>";
     }
     if(imgs.length){
       h+="<div class='fp-sec'><div class='fp-h'>이미지 ("+imgs.length+")</div>";
@@ -864,19 +893,37 @@ window.__resolveLocalImages=async function(src){
   if(closeBtn)closeBtn.addEventListener("click",close);
   modal.addEventListener("click",function(e){if(e.target===modal)close();});
   document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!modal.hidden)close();});
-  function fetchNotes(tag){
-    tag=String(tag||"").replace(/^v/i,"");
-    return fetch("https://api.github.com/repos/"+REPO+"/releases/tags/v"+tag,{headers:{"Accept":"application/vnd.github+json"}})
+  var TITLE="MDeautify Release Note";
+  /* 릴리스 body 선두의 중복 제목(#/## …)을 제거 — 섹션 헤더로 버전을 따로 표기하므로. */
+  function stripHead(md){return String(md||"").replace(/^[ \t]*#{1,2}[ \t]+.*(?:\r?\n)+/,"");}
+  /* 최근 3개 릴리스를 한 번에 받아 각 버전 섹션으로 렌더. */
+  function fetchRecent(){
+    return fetch("https://api.github.com/repos/"+REPO+"/releases?per_page=3",{headers:{"Accept":"application/vnd.github+json"}})
       .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
-      .then(function(j){return {name:j.name||("MDeautify v"+tag),html:(j.body&&typeof marked!=="undefined")?marked.parse(j.body):""};});
+      .then(function(arr){if(!Array.isArray(arr))arr=[];return arr.slice(0,3).map(function(j){
+        var tag=String(j.tag_name||j.name||"").replace(/^v/i,"");
+        return {ver:tag?("v"+tag):(j.name||"릴리스"),
+                date:String(j.published_at||j.created_at||"").slice(0,10),
+                html:(j.body&&typeof marked!=="undefined")?marked.parse(stripHead(j.body)):esc(j.body||"")};
+      });});
   }
-  function render(name,html){if(titleEl)titleEl.textContent=name||"릴리스 노트";if(bodyEl){bodyEl.innerHTML=html||"<p class='nm-loading'>릴리스 노트가 없습니다.</p>";bodyEl.scrollTop=0;}modal.hidden=false;}
-  window.__showReleaseNotes=function(tag){
-    if(titleEl)titleEl.textContent="릴리스 노트";if(bodyEl)bodyEl.innerHTML="<p class='nm-loading'>불러오는 중…</p>";modal.hidden=false;
-    return fetchNotes(tag).then(function(n){render(n.name,n.html);}).catch(function(){if(bodyEl)bodyEl.innerHTML="<p class='nm-err'>릴리스 노트를 불러오지 못했어요.</p>";});
+  function renderList(items){
+    if(titleEl)titleEl.textContent=TITLE;
+    var h="";
+    for(var i=0;i<items.length;i++){var it=items[i];
+      h+="<section class='nm-rel'><div class='nm-rel-head'><span class='nm-ver'>"+esc(it.ver)+"</span>"+
+         (it.date?"<span class='nm-date'>"+esc(it.date)+"</span>":"")+"</div>"+
+         (it.html||"<p class='nm-empty'>내용이 없습니다.</p>")+"</section>";
+    }
+    if(bodyEl){bodyEl.innerHTML=h||"<p class='nm-loading'>릴리스 노트가 없습니다.</p>";bodyEl.scrollTop=0;}
+    modal.hidden=false;
+  }
+  window.__showReleaseNotes=function(){
+    if(titleEl)titleEl.textContent=TITLE;if(bodyEl)bodyEl.innerHTML="<p class='nm-loading'>불러오는 중…</p>";modal.hidden=false;
+    return fetchRecent().then(function(items){if(items.length)renderList(items);else if(bodyEl)bodyEl.innerHTML="<p class='nm-loading'>릴리스 노트가 없습니다.</p>";}).catch(function(){if(bodyEl)bodyEl.innerHTML="<p class='nm-err'>릴리스 노트를 불러오지 못했어요.</p>";});
   };
-  window.__showReleaseNotesAuto=function(tag){
-    return fetchNotes(tag).then(function(n){if(n.html)render(n.name,n.html);}).catch(function(){});
+  window.__showReleaseNotesAuto=function(){
+    return fetchRecent().then(function(items){if(items.length)renderList(items);}).catch(function(){});
   };
 })();
 /* ===== 자동 업데이트 (EXE 전용) =====
