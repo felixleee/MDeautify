@@ -412,7 +412,11 @@ window.MD2R=(function(){var K="md2pdf_remember",regs=[];function on(){try{var v=
   });
 })();
 
-document.getElementById("btnPrint").addEventListener("click",function(){if(!document.body.classList.contains("loaded")){if(window.__appAlert)window.__appAlert("먼저 MD 파일을 불러오세요.","변환할 내용이 없어요");else alert("변환된 내용이 없습니다. 먼저 MD 파일을 불러오세요.");return;}window.print();});
+function __needDoc(){if(!document.body.classList.contains("loaded")){if(window.__appAlert)window.__appAlert("먼저 MD 파일을 불러오세요.","변환할 내용이 없어요");else alert("변환된 내용이 없습니다. 먼저 MD 파일을 불러오세요.");return false;}return true;}
+/* 'PDF 저장' = 원클릭 내보내기(헤드리스 인쇄), 없으면 인쇄 대화상자 폴백 */
+document.getElementById("btnPrint").addEventListener("click",function(){if(!__needDoc())return;if(window.__exportPdf){window.__exportPdf();}else{window.print();}});
+/* '인쇄' = 항상 기존 인쇄 대화상자(실제 프린터 / 대상에서 'PDF로 저장' 선택 가능) */
+var _btnPrintDlg=document.getElementById("btnPrintDlg");if(_btnPrintDlg)_btnPrintDlg.addEventListener("click",function(){if(!__needDoc())return;window.print();});
 /* 상단 'MD 파일 열기' — 파일 선택 창을 열어 다른 MD 파일 불러오기 */
 var _btnOpenTop=document.getElementById("btnOpenTop");if(_btnOpenTop)_btnOpenTop.addEventListener("click",function(){if(window.__nativeOpen){window.__nativeOpen();return;}var fi=document.getElementById("fileInput");if(fi){fi.value="";fi.click();}});
 /* 목차 등 내부 앵커 링크(#슬러그) 클릭 → 뷰어(#pages) 안에서 해당 heading 으로 부드럽게 스크롤(스티키 헤더 높이만큼 보정). */
@@ -824,8 +828,9 @@ window.__resolveLocalImages=async function(src){
         ?"<span class='fp-link on' title='"+esc(window.__mdPath)+"'>🔗 연결됨</span>"
         :"<button type='button' class='fp-link-btn' title='이 문서를 저장할 .md 파일 위치를 지정하면 이후 Ctrl+S로 바로 덮어쓰기됩니다'>파일 연결</button>";}
       /* '연결 필요' 설명은 인라인 문단 대신 전구(💡) 커스텀 UI 툴팁(hover 시 말풍선, transition)으로 — 팝오버를 가볍게 유지. */
-      var HINT="드래그&드롭으로 열어 저장 위치를 몰라요. Ctrl+S나 ‘파일 연결’로 위치를 한 번 지정하면 편집 내용이 원본에 바로 저장됩니다. PDF 저장·인쇄만 할 거면 안 해도 돼요.";
-      var tip=(isExe&&!linked)?"<span class='fp-tip' role='img' aria-label='도움말: 파일 연결'>💡<span class='fp-tip-bubble'><b>파일 연결이 필요해요</b>"+esc(HINT)+"</span></span>":"";
+      /* HINT 는 정적 문자열이라 <strong> 인라인 강조를 그대로 HTML 로 삽입(esc 하지 않음). 제목은 <b>(블록·경고색), 본문 강조는 <strong>(인라인). */
+      var HINT="<strong>드래그&amp;드롭</strong>으로 열어 저장 위치를 몰라요. <strong>Ctrl+S</strong>나 <strong>‘파일 연결’</strong>로 위치를 한 번 지정하면 편집 내용이 원본에 바로 저장됩니다. <strong>PDF 저장·인쇄만</strong> 할 거면 안 해도 돼요.";
+      var tip=(isExe&&!linked)?"<span class='fp-tip' role='img' aria-label='도움말: 파일 연결'>💡<span class='fp-tip-bubble'><b>파일 연결이 필요해요</b>"+HINT+"</span></span>":"";
       h+="<div class='fp-row fp-md-row'><span class='fp-ico'>📄</span><span class='fp-name' title='"+esc(md)+"'>"+esc(md)+"</span>"+(isExe&&!linked?"<span class='fp-link off'>연결 필요</span>":"")+lk+tip+"</div>";
     }
     if(imgs.length){
@@ -869,6 +874,16 @@ window.__resolveLocalImages=async function(src){
     var btn=e.target.closest&&e.target.closest(".fp-ins-btn");if(!btn)return;var name=btn.getAttribute("data-ins");if(!name)return;
     var alt=name.replace(/\.[a-z0-9]+$/i,"");var dest=/\s/.test(name)?"<"+name+">":name;  /* 공백 포함 파일명은 <>로 감싸야 마크다운이 인식 */
     if(window.__img&&window.__img.insert)window.__img.insert("!["+alt+"]("+dest+")");});
+  /* 💡 도움말 툴팁: 버블이 position:fixed 라 #filePop(overflow:auto)·#editor(overflow:hidden) 클리핑을 벗어남.
+     hover 시 아이콘 위치(viewport 기준)에 맞춰 좌표만 잡아준다 → 팝오버보다 위 레이어에서 안 잘리고 표시. */
+  if(pop)pop.addEventListener("mouseover",function(e){
+    var tip=e.target.closest&&e.target.closest(".fp-tip");if(!tip)return;
+    var bub=tip.querySelector(".fp-tip-bubble");if(!bub)return;
+    var r=tip.getBoundingClientRect(),W=236;
+    var left=Math.max(8,Math.min(r.right+6-W, window.innerWidth-W-8));  /* 화살표가 아이콘을 가리키게 우측 정렬 + 뷰포트 클램프 */
+    bub.style.left=left+"px";
+    bub.style.top=(r.bottom+6)+"px";
+  });
 })();
 /* ===== 설정(톱니) 모달 열기/닫기 — 시스템 테마 토글 + 업데이트 UI 담음 ===== */
 (function(){

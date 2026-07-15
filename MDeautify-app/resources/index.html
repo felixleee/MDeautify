@@ -31,7 +31,8 @@
         <button id='btnTheme' title='PDF 설정'>PDF 설정</button>
         <span class='spacer'></span>
         <button id='btnSettings' title='설정' aria-label='설정'><svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><circle cx='12' cy='12' r='3'/><path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'/></svg></button>
-        <button id='btnPrint' title='인쇄창에서 대상을 “PDF로 저장”으로 선택하세요. “Microsoft Print to PDF”는 링크가 빠집니다.'>PDF 저장/인쇄</button>
+        <button id='btnPrint' title='버튼 한 번으로 미리보기 그대로 PDF로 저장합니다. (Edge/Chrome 미설치 등 예외 시 인쇄 대화상자로 전환)'>PDF 저장</button>
+        <button id='btnPrintDlg' title='인쇄 대화상자를 엽니다. 실제 프린터로 인쇄하거나, 대상에서 “PDF로 저장”을 고를 수 있어요.'>인쇄</button>
         <input id='fileInput' type='file' accept='.md,.markdown,.txt,image/*' multiple style='display:none'>
       </div>
       <div id='themeModal' hidden>
@@ -155,7 +156,7 @@
             </svg>
             <h2>MD 파일을 끌어다 놓거나 열어서 시작하세요</h2>
             <div class='sub'>이미지가 있으면 <b>.md 와 이미지 파일을 함께</b>(또는 폴더째) 끌어다 놓으세요. 또는 아래 <b>파일 열기</b> 버튼으로 선택.</div>
-            <div class='drop-note'>왼쪽은 마크다운 원본, 오른쪽은 실제 페이지 단위 미리보기입니다.<br>「PDF 저장/인쇄」 → 인쇄창에서 대상을 <b>‘PDF로 저장’</b> 으로 고르세요. <b>‘Microsoft Print to PDF’ 는 링크가 빠지니 피하세요.</b> (한 번 고르면 다음부터 기본값으로 유지됩니다.)</div>
+            <div class='drop-note'>왼쪽은 마크다운 원본, 오른쪽은 실제 페이지 단위 미리보기입니다.<br>「PDF 저장」 버튼을 누르면 <b>미리보기 그대로</b> 곧바로 PDF 파일로 저장됩니다.</div>
             <button id='btnOpen'>파일 열기</button>
           </div>
         </div>
@@ -169,5 +170,6 @@
       <script src="js/settings/font.js"></script>
       <script src="js/settings/size.js"></script>
       <script src="js/settings/footer.js"></script>
+      <script src="js/export-pdf.js"></script>
     </body>
 </html>
