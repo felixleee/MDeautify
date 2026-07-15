@@ -7,6 +7,31 @@
   const INK = "#1f2937", BORDER = "#94a3b8", ROWALT = "#f1f5f9";
   let HEAD = "#1e3a5f", ACCENT = "#2563eb";
   const themeColor = (name, fb) => { try { const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v || fb; } catch (e) { return fb; } };
+  // 테마색(HSL) 유틸: 하드코딩 팔레트 대신 --brand/--accent 에서 조화로운 다색을 생성
+  function hexToHsl(hex) {
+    hex = (hex || "").replace("#", ""); if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+    let r = parseInt(hex.slice(0, 2), 16) / 255, g = parseInt(hex.slice(2, 4), 16) / 255, b = parseInt(hex.slice(4, 6), 16) / 255;
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return [220, 0.5, 0.4];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0, l = (mx + mn) / 2;
+    if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6; }
+    return [h * 360, s, l];
+  }
+  function hslToHex(h, s, l) {
+    h = ((h % 360) + 360) % 360 / 360; s = Math.max(0, Math.min(1, s)); l = Math.max(0, Math.min(1, l));
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+    const cf = t => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+    const to = v => ("0" + Math.round(v * 255).toString(16)).slice(-2);
+    return "#" + to(cf(h + 1 / 3)) + to(cf(h)) + to(cf(h - 1 / 3));
+  }
+  // ACCENT 색상(hue) 기준 어두움→밝음 명도 램프로 n개 색 생성(테마 일관 · 서로 구분됨)
+  function themeSeries(n) {
+    const a = hexToHsl(ACCENT); if (n <= 1) return [ACCENT];
+    const loL = 0.34, hiL = 0.66, out = [];
+    for (let i = 0; i < n; i++) { const t = i / (n - 1); out.push(hslToHex(a[0], Math.max(0.3, Math.min(0.85, a[1] * (1 - 0.1 * t))), loL + (hiL - loL) * t)); }
+    return out;
+  }
+  // 보조 색(비-PK 키 등): ACCENT hue의 채도 낮춘 중간톤 — 테마와 어울리는 뉴트럴
+  const themeMuted = () => { const a = hexToHsl(ACCENT); return hslToHex(a[0], 0.28, 0.46); };
 
   function esc(s) {
     return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -67,7 +92,7 @@
         if (j % 2 === 1) parts.push(`<rect x="${x + 1}" y="${ry}" width="${bw - 2}" height="${rh}" fill="${ROWALT}"/>`);
         parts.push(`<text x="${x + 10}" y="${ry + 15}" fill="${INK}" font-family="${MONO}" font-size="10.5">${esc(r.name)}<tspan fill="#64748b">  ${esc(r.type)}</tspan></text>`);
         if (r.key) {
-          const c = r.key === "PK" ? ACCENT : "#b45309";
+          const c = r.key === "PK" ? ACCENT : themeMuted();
           parts.push(`<text x="${x + bw - 10}" y="${ry + 15}" text-anchor="end" fill="${c}" font-family="${MONO}" font-size="9" font-weight="bold">${esc(r.key)}</text>`);
         }
       });
@@ -117,7 +142,7 @@
   }
 
   // ---------------- Flow (계층형 레이아웃) ----------------
-  const FLOW_PALETTE = ["#1e3a5f", "#1e3a5f", "#2563eb", "#0369a1", "#0369a1", "#15803d"];
+  // 노드 팔레트는 flow() 안에서 테마색(themeSeries)으로 생성
 
   function cleanLabel(s) {
     return String(s).replace(/^["']|["']$/g, "").replace(/<br\s*\/?>/gi, "\n").trim();
@@ -286,7 +311,8 @@
       }
     });
     // 노드
-    order.forEach((id, idx) => { const p = pos[id]; if (p) drawNode(parts, parsed.nodes[id], p, FLOW_PALETTE[idx % FLOW_PALETTE.length]); });
+    const flowPal = themeSeries(6);
+    order.forEach((id, idx) => { const p = pos[id]; if (p) drawNode(parts, parsed.nodes[id], p, flowPal[idx % flowPal.length]); });
     return `<svg viewBox="0 0 ${Math.ceil(W)} ${Math.ceil(H)}" width="${Math.ceil(W)}" height="${Math.ceil(H)}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
   }
   function labelChip(parts, x, y, text) {
@@ -303,7 +329,7 @@
     const top = 20, headH = 34, row = 34;
     const y0 = top + headH + 24;
     const bottom = y0 + messages.length * row + 10;
-    const palette = ["#1e3a5f", "#1e3a5f", "#334155", "#2563eb", "#0369a1", "#15803d"];
+    const palette = themeSeries(6);
     const parts = [];
     actors.forEach((name, i) => {
       const x = xs[i], col = palette[i % palette.length];
@@ -347,7 +373,7 @@
   }
 
   // ---------------- Pie ----------------
-  const PIE_PALETTE = ["#1e3a5f", "#2563eb", "#0369a1", "#15803d", "#b45309", "#9333ea", "#dc2626", "#0d9488", "#64748b", "#ca8a04"];
+  // 파이 팔레트는 pie() 안에서 테마색(themeSeries)으로 생성
   function parsePie(code) {
     const lines = code.split("\n").map(l => l.trim()).filter(Boolean);
     let title = ""; const data = [];
@@ -366,12 +392,13 @@
     if (!data.length) return `<svg viewBox="0 0 800 60" xmlns="http://www.w3.org/2000/svg"></svg>`;
     const total = data.reduce((s, d) => s + d.value, 0);
     const cx = 175, cy = 190, r = 130;
+    const pal = themeSeries(data.length);
     const parts = [];
     if (parsed.title) parts.push(`<text x="400" y="28" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="16" font-weight="bold">${esc(parsed.title)}</text>`);
     let ang = -Math.PI / 2;
     data.forEach((d, i) => {
       const frac = d.value / total, a2 = ang + frac * 2 * Math.PI;
-      const col = PIE_PALETTE[i % PIE_PALETTE.length];
+      const col = pal[i % pal.length];
       if (data.length === 1) { parts.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${col}"/>`); }
       else {
         const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang), x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
@@ -383,7 +410,7 @@
     });
     const lx0 = 350, ly0 = cy - data.length * 13 + 8;
     data.forEach((d, i) => {
-      const y = ly0 + i * 26, col = PIE_PALETTE[i % PIE_PALETTE.length];
+      const y = ly0 + i * 26, col = pal[i % pal.length];
       parts.push(`<rect x="${lx0}" y="${y - 11}" width="14" height="14" rx="3" fill="${col}"/>`);
       parts.push(`<text x="${lx0 + 22}" y="${y}" fill="${INK}" font-family="${FONT}" font-size="13">${esc(d.label)}<tspan fill="#64748b">  ${d.value} (${(d.value / total * 100).toFixed(1)}%)</tspan></text>`);
     });
