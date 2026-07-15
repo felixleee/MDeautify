@@ -185,6 +185,11 @@
   function drawNode(parts, nd, p, c) {
     const lines = nd._lines || String(nd.label).split("\n");
     const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+    if (nd.shape === "point") { // stateDiagram [*] 시작/끝점
+      parts.push(`<circle cx="${cx}" cy="${cy}" r="13" fill="none" stroke="${INK}" stroke-width="1.5"/>`);
+      parts.push(`<circle cx="${cx}" cy="${cy}" r="8" fill="${INK}"/>`);
+      return;
+    }
     if (nd.shape === "diamond") {
       parts.push(`<polygon points="${cx},${p.y} ${p.x + p.w},${cy} ${cx},${p.y + p.h} ${p.x},${cy}" fill="#fff" stroke="${c}" stroke-width="1.6"/>`);
     } else if (nd.shape === "circle") {
@@ -341,12 +346,208 @@
     return { actors, messages: msgs };
   }
 
+  // ---------------- Pie ----------------
+  const PIE_PALETTE = ["#1e3a5f", "#2563eb", "#0369a1", "#15803d", "#b45309", "#9333ea", "#dc2626", "#0d9488", "#64748b", "#ca8a04"];
+  function parsePie(code) {
+    const lines = code.split("\n").map(l => l.trim()).filter(Boolean);
+    let title = ""; const data = [];
+    for (const line of lines) {
+      if (/^%%/.test(line)) continue;
+      let m = line.match(/^pie\s+(?:showData\s+)?title\s+(.+)$/i); if (m) { title = m[1].trim(); continue; }
+      if (/^pie\b/i.test(line)) continue;
+      m = line.match(/^title\s+(.+)$/i); if (m) { title = m[1].trim(); continue; }
+      m = line.match(/^"([^"]*)"\s*:\s*([\d.]+)$/); if (m) { data.push({ label: m[1], value: parseFloat(m[2]) }); continue; }
+      m = line.match(/^(.+?)\s*:\s*([\d.]+)$/); if (m) { data.push({ label: stripQuotes(m[1]), value: parseFloat(m[2]) }); }
+    }
+    return { title, data };
+  }
+  function pie(parsed) {
+    const data = parsed.data.filter(d => d.value > 0);
+    if (!data.length) return `<svg viewBox="0 0 800 60" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    const total = data.reduce((s, d) => s + d.value, 0);
+    const cx = 175, cy = 190, r = 130;
+    const parts = [];
+    if (parsed.title) parts.push(`<text x="400" y="28" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="16" font-weight="bold">${esc(parsed.title)}</text>`);
+    let ang = -Math.PI / 2;
+    data.forEach((d, i) => {
+      const frac = d.value / total, a2 = ang + frac * 2 * Math.PI;
+      const col = PIE_PALETTE[i % PIE_PALETTE.length];
+      if (data.length === 1) { parts.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${col}"/>`); }
+      else {
+        const x1 = cx + r * Math.cos(ang), y1 = cy + r * Math.sin(ang), x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+        parts.push(`<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${frac > 0.5 ? 1 : 0},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${col}" stroke="#fff" stroke-width="1.5"/>`);
+      }
+      const mid = (ang + a2) / 2, lr = r * 0.6, lx = cx + lr * Math.cos(mid), ly = cy + lr * Math.sin(mid);
+      if (frac > 0.045) parts.push(`<text x="${lx.toFixed(1)}" y="${(ly + 4).toFixed(1)}" text-anchor="middle" fill="#fff" font-family="${FONT}" font-size="12" font-weight="bold">${(frac * 100).toFixed(1)}%</text>`);
+      ang = a2;
+    });
+    const lx0 = 350, ly0 = cy - data.length * 13 + 8;
+    data.forEach((d, i) => {
+      const y = ly0 + i * 26, col = PIE_PALETTE[i % PIE_PALETTE.length];
+      parts.push(`<rect x="${lx0}" y="${y - 11}" width="14" height="14" rx="3" fill="${col}"/>`);
+      parts.push(`<text x="${lx0 + 22}" y="${y}" fill="${INK}" font-family="${FONT}" font-size="13">${esc(d.label)}<tspan fill="#64748b">  ${d.value} (${(d.value / total * 100).toFixed(1)}%)</tspan></text>`);
+    });
+    const h = Math.max(cy + r + 30, ly0 + data.length * 26 + 20);
+    return `<svg viewBox="0 0 800 ${h}" width="800" height="${h}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  }
+
+  // ---------------- State (flow 레이아웃 재사용) ----------------
+  function parseState(code) {
+    const raw = code.split("\n").map(l => l.trim()).filter(l => l && !/^%%/.test(l));
+    raw.shift(); // stateDiagram / stateDiagram-v2
+    const nodes = {}, order = [], edges = []; let dir = "TD";
+    function ensure(id, label, shape) { if (!nodes[id]) { nodes[id] = { id, label: label != null ? label : id, shape: shape || "round" }; order.push(id); } else if (label != null) { nodes[id].label = label; } return id; }
+    function resolve(tok, isTarget) { tok = tok.trim(); if (tok === "[*]") { return ensure(isTarget ? "__end" : "__start", "", "point"); } return ensure(tok, null, "round"); }
+    for (let line of raw) {
+      let m = line.match(/^direction\s+(LR|RL|TB|TD)/i); if (m) { dir = m[1].toUpperCase(); if (dir === "TB") dir = "TD"; continue; }
+      if (/^(note|classDef|class|\}|state\s+\w+\s*\{)/.test(line)) continue;
+      m = line.match(/^state\s+"([^"]*)"\s+as\s+(\S+)/); if (m) { ensure(m[2], cleanLabel(m[1]), "round"); continue; }
+      m = line.match(/^(.+?)\s*-->\s*([^:]+?)(?:\s*:\s*(.+))?$/);
+      if (m) { const a = resolve(m[1], false), b = resolve(m[2], true); edges.push({ from: a, to: b, label: cleanLabel(m[3] || "") }); continue; }
+      m = line.match(/^([A-Za-z0-9_가-힣]+)\s*:\s*(.+)$/); if (m) { ensure(m[1], cleanLabel(m[2]), "round"); }
+    }
+    return { nodes, order, edges, dir };
+  }
+
+  // ---------------- Class ----------------
+  function parseClass(code) {
+    const lines = code.split("\n").map(l => l.trim()).filter(l => l && l !== "classDiagram" && !/^%%/.test(l) && !/^direction/.test(l));
+    const classes = [], index = {}, relations = [];
+    const relRe = /^(\S+)\s*(<\|--|--\|>|<\|\.\.|\.\.\|>|\*--|--\*|o--|--o|-->|<--|\.\.>|<\.\.|--|\.\.)\s*(\S+?)\s*(?::\s*(.+))?$/;
+    let cur = null;
+    function cls(name) { if (index[name] == null) { classes.push({ title: name, rows: [] }); index[name] = classes.length - 1; } return classes[index[name]]; }
+    for (const line of lines) {
+      if (cur) { if (line === "}") { cur = null; continue; } cur.rows.push(line.replace(/^[+\-#~]\s*/, "").trim()); continue; }
+      let m = line.match(/^class\s+([A-Za-z0-9_가-힣]+)\s*\{$/); if (m) { cur = cls(m[1]); continue; }
+      m = line.match(/^class\s+([A-Za-z0-9_가-힣]+)\s*$/); if (m) { cls(m[1]); continue; }
+      m = line.match(relRe);
+      if (m && /[<>o*|.\-]{2,}/.test(m[2])) { cls(m[1]); cls(m[3]); relations.push({ aName: m[1], bName: m[3], type: m[2], label: stripQuotes(m[4] || "") }); continue; }
+      m = line.match(/^([A-Za-z0-9_가-힣]+)\s*:\s*(.+)$/); if (m) { cls(m[1]).rows.push(m[2].replace(/^[+\-#~]\s*/, "").trim()); }
+    }
+    return { classes, relations, index };
+  }
+  function boxEdge(b, tx, ty) {
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2, dx = tx - cx, dy = ty - cy;
+    if (!dx && !dy) return { x: cx, y: cy };
+    const s = Math.min(dx ? (b.w / 2) / Math.abs(dx) : Infinity, dy ? (b.h / 2) / Math.abs(dy) : Infinity);
+    return { x: cx + dx * s, y: cy + dy * s };
+  }
+  function classMarker(parts, px, py, dx, dy, kind) {
+    const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+    const ex = -dy, ey = dx, s = 9, bx = px - dx * s, by = py - dy * s;
+    if (kind === "triangle") parts.push(`<polygon points="${px.toFixed(1)},${py.toFixed(1)} ${(bx + ex * s * .7).toFixed(1)},${(by + ey * s * .7).toFixed(1)} ${(bx - ex * s * .7).toFixed(1)},${(by - ey * s * .7).toFixed(1)}" fill="#fff" stroke="${BORDER}" stroke-width="1.2"/>`);
+    else if (kind === "diamond" || kind === "diamondf") { const mx = px - dx * s, my = py - dy * s, fx = px - dx * s * 2, fy = py - dy * s * 2; parts.push(`<polygon points="${px.toFixed(1)},${py.toFixed(1)} ${(mx + ex * s * .7).toFixed(1)},${(my + ey * s * .7).toFixed(1)} ${fx.toFixed(1)},${fy.toFixed(1)} ${(mx - ex * s * .7).toFixed(1)},${(my - ey * s * .7).toFixed(1)}" fill="${kind === 'diamondf' ? INK : '#fff'}" stroke="${BORDER}" stroke-width="1.2"/>`); }
+    else if (kind === "arrow") parts.push(`<path d="M${(bx + ex * s * .6).toFixed(1)},${(by + ey * s * .6).toFixed(1)} L${px.toFixed(1)},${py.toFixed(1)} L${(bx - ex * s * .6).toFixed(1)},${(by - ey * s * .6).toFixed(1)}" fill="none" stroke="${INK}" stroke-width="1.4"/>`);
+  }
+  function symKind(sym) { if (sym.indexOf("|") >= 0) return "triangle"; if (sym.indexOf("*") >= 0) return "diamondf"; if (sym.indexOf("o") >= 0) return "diamond"; if (sym.indexOf(">") >= 0 || sym.indexOf("<") >= 0) return "arrow"; return null; }
+  function classRender(parsed) {
+    const cls = parsed.classes, rels = parsed.relations || [];
+    if (!cls.length) return `<svg viewBox="0 0 800 40" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    const rh = 20, bw = 190, gapX = 60, gapY = 60, perRow = 3, x0 = 20, y0 = 25;
+    const pos = [], parts = []; let rowY = y0, maxH = 0;
+    cls.forEach((c, i) => { const col = i % perRow; if (col === 0 && i > 0) { rowY += maxH + gapY; maxH = 0; } const h = rh + c.rows.length * rh + (c.rows.length ? 6 : 0); maxH = Math.max(maxH, h); pos.push({ x: x0 + col * (bw + gapX), y: rowY, w: bw, h }); });
+    const totalH = rowY + maxH + 25;
+    rels.forEach(r => {
+      const a = pos[parsed.index[r.aName]], b = pos[parsed.index[r.bName]]; if (!a || !b) return;
+      const ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 }, bc = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+      const p1 = boxEdge(a, bc.x, bc.y), p2 = boxEdge(b, ac.x, ac.y);
+      const dm = r.type.match(/^([<>o*|]*)[-.]+([<>o*|]*)$/), left = dm ? dm[1] : "", right = dm ? dm[2] : "";
+      parts.push(`<line x1="${p1.x.toFixed(1)}" y1="${p1.y.toFixed(1)}" x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}" stroke="${BORDER}" stroke-width="1.4"${/\.\./.test(r.type) ? ' stroke-dasharray="5,4"' : ''}/>`);
+      if (symKind(left)) classMarker(parts, p1.x, p1.y, p1.x - p2.x, p1.y - p2.y, symKind(left));
+      if (symKind(right)) classMarker(parts, p2.x, p2.y, p2.x - p1.x, p2.y - p1.y, symKind(right));
+      if (r.label) parts.push(`<text x="${((p1.x + p2.x) / 2).toFixed(1)}" y="${((p1.y + p2.y) / 2 - 4).toFixed(1)}" text-anchor="middle" fill="#64748b" font-family="${MONO}" font-size="9">${esc(r.label)}</text>`);
+    });
+    cls.forEach((c, i) => {
+      const p = pos[i];
+      parts.push(`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="5" fill="#fff" stroke="${BORDER}" stroke-width="1.2"/>`);
+      parts.push(`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${rh}" rx="5" fill="${HEAD}"/><rect x="${p.x}" y="${p.y + rh - 6}" width="${p.w}" height="6" fill="${HEAD}"/>`);
+      parts.push(`<text x="${p.x + p.w / 2}" y="${p.y + 14}" text-anchor="middle" fill="#fff" font-family="${FONT}" font-size="12" font-weight="bold">${esc(c.title)}</text>`);
+      c.rows.forEach((row, j) => parts.push(`<text x="${p.x + 8}" y="${p.y + rh + j * rh + 14}" fill="${INK}" font-family="${MONO}" font-size="10">${esc(row)}</text>`));
+    });
+    return `<svg viewBox="0 0 800 ${totalH}" width="800" height="${totalH}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  }
+
+  // ---------------- Gantt ----------------
+  function durDays(d) { if (!d) return 1; const m = String(d).match(/^(\d+)\s*([dwh])?$/i); if (!m) return 1; const n = +m[1], u = (m[2] || "d").toLowerCase(); return u === "w" ? n * 7 : (u === "h" ? Math.max(1, Math.round(n / 24)) : n); }
+  function parseGantt(code) {
+    const raw = code.split("\n").map(l => l.trim()).filter(l => l && !/^%%/.test(l));
+    let title = "", section = ""; const tasks = [], byId = {};
+    for (const line of raw) {
+      if (/^gantt\b/i.test(line)) continue;
+      let m = line.match(/^title\s+(.+)$/i); if (m) { title = m[1].trim(); continue; }
+      if (/^(dateFormat|axisFormat|excludes|todayMarker|tickInterval|weekday|inclusiveEndDates)\b/i.test(line)) continue;
+      m = line.match(/^section\s+(.+)$/i); if (m) { section = m[1].trim(); continue; }
+      m = line.match(/^(.+?)\s*:\s*(.*)$/);
+      if (m) {
+        const name = m[1].trim(), toks = m[2].split(",").map(s => s.trim()).filter(Boolean);
+        let id = null, start = null, after = null, dur = null, milestone = false, status = "";
+        toks.forEach(tok => {
+          if (/^(done|active|crit)$/i.test(tok)) status = tok.toLowerCase();
+          else if (/^milestone$/i.test(tok)) milestone = true;
+          else if (/^\d{4}-\d{2}-\d{2}$/.test(tok)) start = tok;
+          else if (/^after\s+/i.test(tok)) after = tok.replace(/^after\s+/i, "").trim();
+          else if (/^\d+\s*[dwh]?$/i.test(tok) && dur == null && !/^\d{4}$/.test(tok)) dur = tok;
+          else if (id == null) id = tok;
+        });
+        const t = { name, section, id, start, after, dur, milestone, status, s: null, e: null };
+        tasks.push(t); if (id) byId[id] = t;
+      }
+    }
+    return { title, tasks, byId };
+  }
+  function gantt(parsed) {
+    const tasks = parsed.tasks; if (!tasks.length) return `<svg viewBox="0 0 800 40" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    const toDay = iso => { const dt = new Date(iso + "T00:00:00Z"); return isNaN(dt) ? null : Math.round(dt.getTime() / 86400000); };
+    const fromDay = d => { const dt = new Date(d * 86400000); return dt.toISOString().slice(5, 10); };
+    for (let pass = 0; pass < tasks.length + 1; pass++) {
+      let changed = false;
+      tasks.forEach((t, idx) => {
+        if (t.s != null) return; let s = null;
+        if (t.start) s = toDay(t.start);
+        else if (t.after) { const r = parsed.byId[t.after]; if (r && r.e != null) s = r.e; }
+        else if (idx > 0 && tasks[idx - 1].e != null) s = tasks[idx - 1].e;
+        else if (idx === 0) s = 0;
+        if (s != null) { t.s = s; t.e = s + durDays(t.dur); changed = true; }
+      });
+      if (!changed) break;
+    }
+    let cursor = 0; tasks.forEach(t => { if (t.s == null) { t.s = cursor; t.e = cursor + durDays(t.dur); } cursor = Math.max(cursor, t.e); });
+    const minD = Math.min.apply(null, tasks.map(t => t.s)), maxD = Math.max.apply(null, tasks.map(t => t.e)), span = Math.max(1, maxD - minD);
+    const labelW = 190, chartX = labelW + 12, chartW = 560, rowH = 24, top = parsed.title ? 52 : 24;
+    const X = d => chartX + (d - minD) / span * chartW;
+    const colorOf = t => t.status === "done" ? "#94a3b8" : t.status === "active" ? ACCENT : t.status === "crit" ? "#dc2626" : HEAD;
+    const parts = []; let y = top, curSec = null;
+    if (parsed.title) parts.push(`<text x="400" y="30" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="16" font-weight="bold">${esc(parsed.title)}</text>`);
+    const bodyTop = y;
+    tasks.forEach(t => {
+      if (t.section !== curSec) { curSec = t.section; if (curSec) { parts.push(`<text x="12" y="${y + 15}" fill="${INK}" font-family="${FONT}" font-size="12" font-weight="bold">${esc(curSec)}</text>`); y += rowH; } }
+      const ry = y;
+      parts.push(`<text x="${labelW}" y="${ry + 16}" text-anchor="end" fill="${INK}" font-family="${FONT}" font-size="11">${esc(t.name)}</text>`);
+      if (t.milestone) { const mx = X(t.s), my = ry + rowH / 2, rr = 7; parts.push(`<polygon points="${mx.toFixed(1)},${my - rr} ${(mx + rr).toFixed(1)},${my} ${mx.toFixed(1)},${my + rr} ${(mx - rr).toFixed(1)},${my}" fill="${colorOf(t)}"/>`); }
+      else { const bx = X(t.s), bw = Math.max(3, X(t.e) - X(t.s)); parts.push(`<rect x="${bx.toFixed(1)}" y="${ry + 4}" width="${bw.toFixed(1)}" height="${rowH - 8}" rx="3" fill="${colorOf(t)}" opacity="${t.status === 'done' ? 0.55 : 0.92}"/>`); }
+      y += rowH;
+    });
+    const bodyBottom = y, grid = [];
+    let step = Math.ceil(span / 8); if (step < 1) step = 1;
+    for (let d = minD; d <= maxD + 0.001; d += step) {
+      const gx = X(d);
+      grid.push(`<line x1="${gx.toFixed(1)}" y1="${bodyTop - 4}" x2="${gx.toFixed(1)}" y2="${bodyBottom}" stroke="#e2e8f0" stroke-width="1"/>`);
+      grid.push(`<text x="${gx.toFixed(1)}" y="${bodyBottom + 16}" text-anchor="middle" fill="#64748b" font-family="${MONO}" font-size="9">${fromDay(Math.round(d))}</text>`);
+    }
+    const h = bodyBottom + 30;
+    return `<svg viewBox="0 0 800 ${h}" width="800" height="${h}" xmlns="http://www.w3.org/2000/svg">${grid.join("")}${parts.join("")}</svg>`;
+  }
+
   function render(kind, code) {
     try {
       HEAD = themeColor("--brand", "#1e3a5f"); ACCENT = themeColor("--accent", "#2563eb");
       if (kind === "er") { const p = parseEr(code); return erd(p.entities, p.relations); }
       if (kind === "flow") { return flow(parseFlow(code)); }
       if (kind === "seq") { const p = parseSeq(code); return sequence(p.actors, p.messages); }
+      if (kind === "pie") { return pie(parsePie(code)); }
+      if (kind === "state") { return flow(parseState(code)); }
+      if (kind === "class") { return classRender(parseClass(code)); }
+      if (kind === "gantt") { return gantt(parseGantt(code)); }
     } catch (e) { return `<pre>diagram error: ${esc(e && e.message || e)}</pre>`; }
     return "";
   }
@@ -356,10 +557,14 @@
     if (/^erDiagram/.test(t)) return "er";
     if (/^sequenceDiagram/.test(t)) return "seq";
     if (/^(flowchart|graph)\b/.test(t)) return "flow";
+    if (/^pie\b/.test(t)) return "pie";
+    if (/^stateDiagram(-v2)?\b/.test(t)) return "state";
+    if (/^classDiagram\b/.test(t)) return "class";
+    if (/^gantt\b/.test(t)) return "gantt";
     return null;
   }
 
-  const api = { erd, flow, sequence, parseEr, parseFlow, parseSeq, render, detectKind };
+  const api = { erd, flow, sequence, pie, parsePie, parseState, classRender, parseClass, gantt, parseGantt, parseEr, parseFlow, parseSeq, render, detectKind };
   root.DIAG = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : this);
