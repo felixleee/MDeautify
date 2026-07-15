@@ -180,7 +180,7 @@ body.loaded #fileBadge{display:inline-flex;}
 #notesModal .nm-card{background:var(--tm-card);color:var(--tm-fg);border:1px solid var(--tm-border);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.4);width:520px;max-width:calc(100vw - 48px);max-height:calc(100vh - 96px);display:flex;flex-direction:column;overflow:hidden;}
 #notesModal .nm-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 18px;border-bottom:1px solid var(--tm-border);flex:0 0 auto;}
 #notesModal .nm-title{font-size:15px;font-weight:800;color:var(--tm-fg);}
-#notesModal .nm-body{padding:14px 20px 18px;overflow-y:auto;font-size:13px;line-height:1.6;color:var(--tm-fg2);}
+#notesModal .nm-body{flex:1 1 auto;min-height:0;padding:14px 20px 18px;overflow-y:auto;overscroll-behavior:contain;font-size:13px;line-height:1.6;color:var(--tm-fg2);}
 #notesModal .nm-body>:first-child{margin-top:0;}
 #notesModal .nm-body h1,#notesModal .nm-body h2{font-size:15px;font-weight:800;color:var(--tm-fg);margin:2px 0 10px;padding:0;border:0;}
 #notesModal .nm-body h3{font-size:12.5px;font-weight:800;color:var(--ui-brand-accent);margin:15px 0 6px;text-transform:none;letter-spacing:0;}
