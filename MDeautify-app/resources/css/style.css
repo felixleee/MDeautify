@@ -364,4 +364,5 @@ body.loaded #fileBadge{display:inline-flex;}
   #pages .fallback-doc .content pre,#pages .fallback-doc .content blockquote,#pages .fallback-doc .content figure,#pages .paper .content pre,#pages .paper .content blockquote,#pages .paper .content figure{break-inside:avoid;page-break-inside:avoid;}
   #pages .fallback-doc .content h2,#pages .fallback-doc .content h3,#pages .fallback-doc .content h4,#pages .paper .content h2,#pages .paper .content h3,#pages .paper .content h4{break-after:avoid;page-break-after:avoid;}
   #pages .fallback-doc .cover,#pages .paper .cover{page-break-after:always;}
+  #pages .fallback-doc .content .katex-display,#pages .paper .content .katex-display{break-inside:avoid;page-break-inside:avoid;}
 }

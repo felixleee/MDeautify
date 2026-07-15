@@ -115,6 +115,17 @@ var title=meta.title||meta["제목"]||"";if(title)srcmd=srcmd.replace(/^\s*#\s+(
 marked.setOptions({gfm:true,breaks:false});
 /* 삭선은 겹물결(~~)일 때만. 홑물결(~)은 범위표기(예:166~169)로 보고 그대로 둠 */
 if(!marked.__delFix){marked.__delFix=1;marked.use({tokenizer:{del(src){var m=/^~~(?=\S)([\s\S]*?\S)~~/.exec(src);if(m){return {type:"del",raw:m[0],text:m[1],tokens:this.lexer.inlineTokens(m[1])};}if(src.charCodeAt(0)===126){return {type:"text",raw:"~",text:"~"};}return false;}}});}
+/* KaTeX 수식: 블록 $$…$$ (display) · 인라인 $…$ . $5 같은 통화 오인식은 앞뒤 공백/숫자 규칙으로 회피.
+   throwOnError:false → 오류는 KaTeX가 붉게 표시(문서 렌더 중단 안 함). 코드블록/인라인코드 안은 marked가 먼저 처리하므로 미영향. */
+if(!marked.__katexExt&&typeof katex!=="undefined"){marked.__katexExt=1;marked.use({extensions:[
+  {name:"blockMath",level:"block",start:function(s){return s.indexOf("$$");},
+   tokenizer:function(src){var m=/^\$\$([\s\S]+?)\$\$(?:\n+|$)/.exec(src);if(m)return {type:"blockMath",raw:m[0],text:m[1].trim()};},
+   renderer:function(t){try{return "<div class=\"katex-block\">"+katex.renderToString(t.text,{displayMode:true,throwOnError:false})+"</div>";}catch(e){return "<pre>KaTeX: "+esc(String(e&&e.message||e))+"</pre>";}}},
+  {name:"inlineMath",level:"inline",start:function(s){return s.indexOf("$");},
+   tokenizer:function(src){var m=/^\$\$((?:\\.|[^$])+?)\$\$/.exec(src);if(m)return {type:"inlineMath",raw:m[0],text:m[1].trim(),display:true};
+     m=/^\$(?! )((?:\\\$|[^$\n])+?)(?<! )\$(?!\d)/.exec(src);if(m)return {type:"inlineMath",raw:m[0],text:m[1].trim(),display:false};},
+   renderer:function(t){try{return katex.renderToString(t.text,{displayMode:!!t.display,throwOnError:false});}catch(e){return esc(t.raw);}}}
+]});}
 /* 아래 이미지 전처리는 코드블록(``` / ~~~, 백틱 개수 무관)·인라인 코드 '밖'에서만 수행
    → 안내서의 '문법 예시'가 실제로 변환돼 버리는 것 방지. 줄 수는 그대로 유지. */
 function outsideCode(text,fn){
