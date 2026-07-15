@@ -68,6 +68,38 @@
               </div>
             </div>
           </div>
+          <div class='tm-fontsec'>
+            <div class='tm-sec-head'>
+              <span class='tm-sec-title'>페이지</span>
+            </div>
+            <div class='tm-font'>
+              <label for='tmH2Break'>제목(H2)마다 새 페이지</label>
+              <input type='checkbox' id='tmH2Break' class='tm-switch'>
+            </div>
+            <div class='tm-font'>
+              <label for='tmToc'>목차(TOC) 자동 생성</label>
+              <input type='checkbox' id='tmToc' class='tm-switch'>
+            </div>
+          </div>
+          <div class='tm-foot'>
+            <div class='tm-foot-head'>
+              <label for='tmHeader'>쪽 머리말(Header)</label>
+              <input type='checkbox' id='tmHeader' class='tm-switch'>
+            </div>
+            <div class='tm-foot-body' id='tmHeaderBody'>
+              <input type='text' id='tmHeaderText' placeholder='예: {title}'>
+              <div class='tm-foot-vars'>사용 가능 변수: {pageNumber} , {totalPages} , {title}</div>
+              <div class='tm-foot-row'>
+                <label for='tmHeaderAlign'>정렬</label>
+                <select id='tmHeaderAlign'>
+                  <option value='left'>왼쪽</option>
+                  <option value='center'>가운데</option>
+                  <option value='right'>오른쪽</option>
+                </select>
+              </div>
+              <label class='tm-foot-border'><input type='checkbox' id='tmHeaderBorder'>구분선 표시</label>
+            </div>
+          </div>
           <div class='tm-foot'>
             <div class='tm-foot-head'>
               <label for='tmFooter'>쪽 바닥글(Footer)</label>
@@ -169,7 +201,10 @@
       <script src="js/settings/theme.js"></script>
       <script src="js/settings/font.js"></script>
       <script src="js/settings/size.js"></script>
+      <script src="js/settings/pagebreak.js"></script>
+      <script src="js/settings/toc.js"></script>
       <script src="js/settings/footer.js"></script>
+      <script src="js/settings/header.js"></script>
       <script src="js/export-pdf.js"></script>
     </body>
 </html>

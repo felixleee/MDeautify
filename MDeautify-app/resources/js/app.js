@@ -28,7 +28,7 @@ Object.keys(meta).forEach(function(k){if(special[k])return;rows+="<tr><td class=
 if(!title&&!subtitle&&!rows)return"";
 return "<div class='cover'>"+(kicker?"<div class='kicker'>"+esc(kicker)+"</div>":"")+"<h1>"+esc(title)+"</h1><div class='st'>"+esc(subtitle)+"</div><div class='bar'></div>"+(rows?"<table>"+rows+"</table>":"")+"</div>";}
 
-var PAGED_CSS="@page{size:A4;margin:18mm 15mm;@bottom-center{content:counter(page);font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}}.content h1,.content h2,.content h3,.content h4{break-after:avoid-page;-webkit-column-break-after:avoid;}.content tr,.content img,.content svg,.content figure,.content pre,.content blockquote{break-inside:avoid;}.content table,.content ul,.content ol{break-inside:auto;}.content thead{break-after:avoid;}.pb-before{break-before:page;}.cover{break-after:page;}.content p,.content li{orphans:2;widows:2;}";
+var PAGED_CSS="@page{size:A4;margin:18mm 15mm;@bottom-center{content:counter(page);font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}@top-center{content:' ';font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}}.content h1,.content h2,.content h3,.content h4{break-after:avoid-page;-webkit-column-break-after:avoid;}.content tr,.content img,.content svg,.content figure,.content pre,.content blockquote{break-inside:avoid;}.content table,.content ul,.content ol{break-inside:auto;}.content thead{break-after:avoid;}.pb-before{break-before:page;}.cover{break-after:page;}.toc{break-after:page;}.content p,.content li{orphans:2;widows:2;}";
 
 /* 경량 구문 강조기: 주석/문자열/숫자/키워드/함수명 토큰만 span으로 감쌈(정식 파서 아님, 다국어 공통) */
 /* 경량 다국어 구문 강조기(정식 파서 아님). 언어 지정(```lang) 블록에만 적용. 지원: js,ts,c,cpp,cs,php,python,bash,powershell,sql,json / html,css,scss,markdown */
@@ -127,6 +127,8 @@ function outsideCode(text,fn){
   return out.join("\n");
 }
 srcmd=outsideCode(srcmd,function(s){
+  /* 강제 페이지 나눔: 한 줄짜리 <!-- pagebreak --> → 마커 div. 조판 후 다음 블록에 break-before 를 부여(아래 후처리). */
+  s=s.replace(/^\s*<!--\s*pagebreak\s*-->\s*$/i,'<div class="pb-marker"></div>');
   /* 이미지 크기 단축 문법(marked 미지원): ![alt](src =300x200)·=300x·=x200·=50%·=300 → <img>. */
   s=s.replace(/!\[([^\]]*)\]\(\s*([^()]*(?:\([^)]*\)[^()]*)*?)\s+=\s*(\d+x\d+|\d+x|x\d+|\d+%|\d+)\s*\)/g,function(m,alt,dest,sz){
     var d=dest.replace(/^<|>$/g,"").trim();if(!d||/["']/.test(d))return m;
@@ -155,10 +157,33 @@ src.innerHTML=buildCover(meta)+"<div class='content'>"+marked.parse(srcmd)+"</di
   var id;if(seen[base]==null){seen[base]=0;id=base;}else{seen[base]++;id=base+"-"+seen[base];}
   h.id=id;
 });})();
+/* 자동 목차(window.__tocOn): H1~H3 을 훑어 표지와 본문 사이에 목차 페이지 삽입(번호는 빈칸→조판 후 fillToc가 채움).
+   점선 리더 = flex-grow 되는 .toc-dots. 앵커는 제목 슬러그 id(뷰어 클릭 핸들러가 스크롤). */
+if(window.__tocOn){
+  var _hs=src.querySelectorAll(".content h1,.content h2,.content h3");
+  if(_hs.length){
+    function _e(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+    var _items="";
+    _hs.forEach(function(h){
+      var lv=+h.tagName.slice(1),hid=h.id||"",txt=(h.textContent||"").trim();
+      _items+="<div class='toc-entry toc-l"+lv+"' data-target='"+_e(hid).replace(/'/g,"&#39;")+"'>"+
+        "<a class='toc-link' href='#"+_e(hid)+"'>"+_e(txt)+"</a>"+
+        "<span class='toc-dots' aria-hidden='true'></span><span class='toc-pg'></span></div>";
+    });
+    var _toc=document.createElement("section");_toc.className="toc";
+    _toc.innerHTML="<div class='toc-title'>목차</div>"+_items;
+    var _content=src.querySelector(".content");
+    if(_content)src.insertBefore(_toc,_content);
+  }
+}
 /* 링크 구분: 내부 앵커(#..)=섹션 이동(sec-link, 뷰어 클릭 핸들러가 처리) / 그 외=외부 웹 링크(ext-link, 새 탭). CSS 가 §·↗ 마커로 시각 구분. */
 src.querySelectorAll(".content a[href]").forEach(function(a){var hv=a.getAttribute("href")||"";if(hv.charAt(0)==="#"){a.classList.add("sec-link");return;}a.classList.add("ext-link");a.setAttribute("target","_blank");a.setAttribute("rel","noopener noreferrer");});
 src.querySelectorAll(".content h1, .content h2, .content h3").forEach(function(h){var m=h.innerHTML.match(/^([A-Z])[.)·]?\s+([\s\S]*)$/);if(m)h.innerHTML="<span class='sn'>"+m[1]+"</span>"+m[2];});
 src.querySelectorAll("code.language-mermaid").forEach(function(c){var pre=c.closest("pre")||c;var kind=window.DIAG?DIAG.detectKind(c.textContent):null;var fig=document.createElement("figure");if(kind){fig.innerHTML=DIAG.render(kind,c.textContent);}else{var type=(c.textContent.trim().split(/\s+/)[0]||"diagram");var box=document.createElement("div");box.className="diag-unsupported";var ti=document.createElement("div");ti.className="du-title";ti.textContent="지원하지 않는 다이어그램: "+type+" (지원: flowchart · erDiagram · sequenceDiagram)";var pp=document.createElement("pre");pp.textContent=c.textContent;box.appendChild(ti);box.appendChild(pp);fig.appendChild(box);}pre.replaceWith(fig);});
+/* 강제 페이지 나눔 마커(<!-- pagebreak -->): 다음 블록에 break-before(.pb-before) 부여 후 마커 제거. 뒤에 내용 없으면 무시(빈 페이지 방지). */
+src.querySelectorAll(".content .pb-marker").forEach(function(mk){var nx=mk.nextElementSibling;if(nx)nx.classList.add("pb-before");mk.remove();});
+/* 옵션(window.__h2NewPage): 제목(H2)마다 새 페이지에서 시작. 단 문서가 H2로 바로 시작하면 첫 H2는 제외(표지/시작 직후 빈 페이지 방지). */
+if(window.__h2NewPage){var _blk=src.querySelectorAll(".content > *");var _firstIsH2=_blk.length&&_blk[0].tagName==="H2";var _h2=src.querySelectorAll(".content h2");for(var _i=0;_i<_h2.length;_i++){if(_i===0&&_firstIsH2)continue;_h2[_i].classList.add("pb-before");}}
 /* 언어 지정 코드블록만 구문 강조(언어 없는 블록=예시는 단색 유지 → 예시/실제 구별됨). mermaid는 위에서 이미 처리됨 */
 src.querySelectorAll("pre code[class*='language-']").forEach(function(c){var mm=(c.className||"").match(/language-([\w#+.-]+)/);c.innerHTML=hlCode(c.textContent,mm?mm[1]:"");});
 var fixed={"상태":"6%","id":"7%","tier":"6%","심각도":"9%","담당":"8%"};
@@ -283,6 +308,8 @@ function runPaged(src,keepScroll){
       swapIn();
       repeatTableHeaders(pages);
       if(typeof applyFooter==="function")applyFooter();
+      if(typeof applyHeader==="function")applyHeader();
+      if(typeof fillToc==="function")fillToc();
       var n=pages.querySelectorAll(".pagedjs_page").length||((flow&&flow.total)||0);
       setHead("Total "+n+" page"+(n>1?"s":""));
       restore();

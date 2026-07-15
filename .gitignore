@@ -13,6 +13,7 @@ MDeautify-app/dist/
 
 # ── 임시/상태 파일 ──
 .tmp/
+shots/
 .storage/
 **/.storage/
 window_state.config.json
