@@ -585,6 +585,177 @@
     return `<svg viewBox="0 0 800 ${h}" width="800" height="${h}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
   }
 
+  // ---------------- Journey (사용자 여정: 만족도 곡선) ----------------
+  function parseJourney(code) {
+    const raw = code.split("\n").filter(l => l.trim() && !/^%%/.test(l.trim()));
+    let title = "", section = ""; const tasks = [], actors = [];
+    for (const line of raw) {
+      const t = line.trim();
+      if (/^journey\b/i.test(t)) continue;
+      let m = t.match(/^title\s+(.+)$/i); if (m) { title = m[1].trim(); continue; }
+      m = t.match(/^section\s+(.+)$/i); if (m) { section = m[1].trim(); continue; }
+      m = t.match(/^(.+?)\s*:\s*(\d+)\s*(?::\s*(.+))?$/);
+      if (m) {
+        const acts = (m[3] || "").split(",").map(s => s.trim()).filter(Boolean);
+        acts.forEach(a => { if (actors.indexOf(a) < 0) actors.push(a); });
+        tasks.push({ name: m[1].trim(), score: Math.max(0, Math.min(5, parseInt(m[2], 10))), actors: acts, section });
+      }
+    }
+    return { title, tasks, actors };
+  }
+  function journey(parsed) {
+    const tasks = parsed.tasks; if (!tasks.length) return `<svg viewBox="0 0 800 40" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    const W = 800, padL = 44, padR = 20, n = tasks.length;
+    const plotX0 = padL, plotW = W - padR - padL;
+    const hasSec = tasks.some(t => t.section);
+    const titleH = parsed.title ? 34 : 8, secH = hasSec ? 24 : 0;
+    const plotTop = titleH + secH + 8, plotH = 150, plotBottom = plotTop + plotH;
+    const slotW = plotW / n;
+    const X = i => plotX0 + (i + 0.5) * slotW;
+    const Y = s => plotBottom - (s / 5) * (plotH - 16) - 8;
+    const scorePal = themeSeries(5), actorPal = themeSeries(Math.max(2, parsed.actors.length));
+    const tint = c => { const a = hexToHsl(c); return hslToHex(a[0], Math.min(a[1], 0.5), 0.9); };
+    const parts = [];
+    if (parsed.title) parts.push(`<text x="${W / 2}" y="26" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="16" font-weight="bold">${esc(parsed.title)}</text>`);
+    // 섹션 밴드(상단)
+    if (hasSec) {
+      const runs = []; let cur = null;
+      tasks.forEach((t, i) => { if (!cur || cur.section !== t.section) { cur = { section: t.section, s: i, e: i }; runs.push(cur); } else cur.e = i; });
+      runs.forEach((r, ri) => {
+        if (!r.section) return;
+        const bx = plotX0 + r.s * slotW, bw = (r.e - r.s + 1) * slotW, sc = scorePal[ri % 5];
+        parts.push(`<rect x="${bx.toFixed(1)}" y="${titleH}" width="${bw.toFixed(1)}" height="${secH - 6}" rx="4" fill="${tint(sc)}"/>`);
+        parts.push(`<text x="${(bx + bw / 2).toFixed(1)}" y="${titleH + (secH - 6) / 2 + 4}" text-anchor="middle" fill="${HEAD}" font-family="${FONT}" font-size="10.5" font-weight="bold">${esc(r.section)}</text>`);
+      });
+    }
+    // 점수 격자(1~5)
+    for (let s = 1; s <= 5; s++) { const gy = Y(s); parts.push(`<line x1="${plotX0}" y1="${gy.toFixed(1)}" x2="${W - padR}" y2="${gy.toFixed(1)}" stroke="#eef1f5" stroke-width="1"/><text x="${plotX0 - 8}" y="${(gy + 3.5).toFixed(1)}" text-anchor="end" fill="#94a3b8" font-family="${MONO}" font-size="9">${s}</text>`); }
+    // 만족도 곡선
+    const pts = tasks.map((t, i) => [X(i), Y(t.score)]);
+    parts.push(`<polyline points="${pts.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ")}" fill="none" stroke="${ACCENT}" stroke-width="2.2"/>`);
+    // 작업 점 + 점수 + 이름 + 참여자 점
+    let maxNameLines = 1;
+    tasks.forEach((t, i) => {
+      const x = X(i), y = Y(t.score), col = scorePal[Math.max(0, Math.min(4, t.score - 1))];
+      // 참여자 점(점 위)
+      t.actors.forEach((a, j) => { const ai = parsed.actors.indexOf(a), dx = x - (t.actors.length - 1) * 5 + j * 10; parts.push(`<circle cx="${dx.toFixed(1)}" cy="${(y - 20).toFixed(1)}" r="3.6" fill="${actorPal[ai % actorPal.length]}" stroke="#fff" stroke-width="0.8"/>`); });
+      parts.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="${col}" stroke="#fff" stroke-width="2"/>`);
+      parts.push(`<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" fill="#fff" font-family="${FONT}" font-size="11" font-weight="bold">${t.score}</text>`);
+      const nl = wrapLine(t.name, slotW - 6, 9); maxNameLines = Math.max(maxNameLines, nl.length);
+      nl.forEach((ln, k) => parts.push(`<text x="${x.toFixed(1)}" y="${(plotBottom + 15 + k * 11).toFixed(1)}" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="9">${esc(ln)}</text>`));
+    });
+    // 참여자 범례
+    let h = plotBottom + 15 + maxNameLines * 11 + 8;
+    if (parsed.actors.length) {
+      let lx = plotX0; const ly = h + 6;
+      parsed.actors.forEach((a, i) => { parts.push(`<circle cx="${lx + 5}" cy="${ly - 3}" r="4" fill="${actorPal[i % actorPal.length]}"/><text x="${lx + 14}" y="${ly}" fill="#64748b" font-family="${FONT}" font-size="10">${esc(a)}</text>`); lx += 24 + textW(a, 10); });
+      h = ly + 12;
+    }
+    return `<svg viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  }
+
+  // ---------------- Mindmap (들여쓰기 트리 → 좌→우 트리) ----------------
+  function parseMindmap(code) {
+    const raw = code.split("\n").filter(l => l.trim() && !/^%%/.test(l.trim()));
+    raw.shift(); // mindmap
+    const shapeOf = s => {
+      s = s.trim(); let m;
+      if (m = s.match(/\(\((.+)\)\)$/)) return { label: m[1], shape: "circle" };
+      if (m = s.match(/\{\{(.+)\}\}$/)) return { label: m[1], shape: "hex" };
+      if (m = s.match(/\[(.+)\]$/)) return { label: m[1], shape: "square" };
+      if (m = s.match(/\((.+)\)$/)) return { label: m[1], shape: "round" };
+      return { label: s.replace(/:::\S+/g, "").replace(/::icon\([^)]*\)/g, "").trim(), shape: "round" };
+    };
+    const root = { label: "", depth: -1, children: [] };
+    const stack = [{ node: root, indent: -1 }];
+    raw.forEach(line => {
+      const indent = line.match(/^\s*/)[0].replace(/\t/g, "  ").length;
+      const sp = shapeOf(line); if (!sp.label) return;
+      while (stack.length > 1 && stack[stack.length - 1].indent >= indent) stack.pop();
+      const parent = stack[stack.length - 1].node;
+      const node = { label: sp.label, shape: sp.shape, depth: parent.depth + 1, children: [] };
+      parent.children.push(node); stack.push({ node, indent });
+    });
+    return root.children[0] || null;
+  }
+  function mindmap(rootNode) {
+    if (!rootNode) return `<svg viewBox="0 0 800 40" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    const all = []; let maxDepth = 0;
+    (function collect(n) { n._w = Math.max(56, Math.min(180, textW(n.label, 12) + 24)); all.push(n); maxDepth = Math.max(maxDepth, n.depth); n.children.forEach(collect); })(rootNode);
+    const colGap = Math.max.apply(null, all.map(n => n._w)) + 46;
+    const rowGap = 34, xM = 16, yM = 18; let leafY = 0;
+    (function layout(n) {
+      n.x = xM + n.depth * colGap;
+      if (!n.children.length) { n.y = yM + leafY * rowGap + rowGap / 2; leafY++; return; }
+      n.children.forEach(layout); n.y = (n.children[0].y + n.children[n.children.length - 1].y) / 2;
+    })(rootNode);
+    const W = Math.max(600, xM * 2 + (maxDepth + 1) * colGap), H = yM * 2 + Math.max(1, leafY) * rowGap;
+    const pal = themeSeries(Math.max(3, maxDepth + 1)), parts = [];
+    all.forEach(n => n.children.forEach(ch => {
+      const x1 = n.x + n._w, y1 = n.y, x2 = ch.x, y2 = ch.y, mx = (x1 + x2) / 2;
+      parts.push(`<path d="M${x1.toFixed(1)},${y1.toFixed(1)} C${mx.toFixed(1)},${y1.toFixed(1)} ${mx.toFixed(1)},${y2.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}" fill="none" stroke="${BORDER}" stroke-width="1.4"/>`);
+    }));
+    all.forEach(n => {
+      const col = n.depth === 0 ? HEAD : pal[Math.min(n.depth, pal.length - 1)], h = 26, x = n.x, y = n.y - h / 2;
+      const rx = n.shape === "circle" ? h / 2 : n.shape === "square" ? 3 : n.shape === "hex" ? 7 : 13;
+      parts.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${n._w}" height="${h}" rx="${rx}" fill="${n.depth === 0 ? HEAD : "#fff"}" stroke="${col}" stroke-width="${n.depth === 0 ? 0 : 1.6}"/>`);
+      parts.push(`<text x="${(x + n._w / 2).toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" fill="${n.depth === 0 ? "#fff" : INK}" font-family="${FONT}" font-size="12"${n.depth === 0 ? ' font-weight="bold"' : ''}>${esc(n.label)}</text>`);
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  }
+
+  // ---------------- Timeline (가로 연대표) ----------------
+  function parseTimeline(code) {
+    const raw = code.split("\n").filter(l => l.trim() && !/^%%/.test(l.trim()));
+    raw.shift(); // timeline
+    let title = "", section = ""; const periods = [];
+    for (const line of raw) {
+      const t = line.trim();
+      let m = t.match(/^title\s+(.+)$/i); if (m) { title = m[1].trim(); continue; }
+      m = t.match(/^section\s+(.+)$/i); if (m) { section = m[1].trim(); continue; }
+      const segs = t.split(":").map(s => s.trim()), time = segs[0], events = segs.slice(1).filter(Boolean);
+      if (!time && periods.length) { periods[periods.length - 1].events.push(...events); continue; }
+      if (!time && !events.length) continue;
+      periods.push({ time, events, section });
+    }
+    return { title, periods };
+  }
+  function timeline(parsed) {
+    const P = parsed.periods; if (!P.length) return `<svg viewBox="0 0 800 40" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    const W = 800, xM = 18, n = P.length, colW = (W - xM * 2) / n, X = i => xM + colW * i + colW / 2;
+    const hasSec = P.some(p => p.section);
+    const titleH = parsed.title ? 34 : 10, secH = hasSec ? 24 : 0;
+    const axisY = titleH + secH + 26, evTop = axisY + 22, evH = 34, evGap = 7;
+    const maxEv = Math.max(1, Math.max.apply(null, P.map(p => p.events.length)));
+    const secs = []; P.forEach(p => { if (p.section && secs.indexOf(p.section) < 0) secs.push(p.section); });
+    const secPal = themeSeries(Math.max(2, secs.length));
+    const colFor = p => p.section ? secPal[secs.indexOf(p.section) % secPal.length] : ACCENT;
+    const tint = c => { const a = hexToHsl(c); return hslToHex(a[0], Math.min(a[1], 0.55), 0.92); };
+    const parts = [];
+    if (parsed.title) parts.push(`<text x="${W / 2}" y="26" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="16" font-weight="bold">${esc(parsed.title)}</text>`);
+    if (hasSec) {
+      const runs = []; let cur = null;
+      P.forEach((p, i) => { if (!cur || cur.section !== p.section) { cur = { section: p.section, s: i, e: i }; runs.push(cur); } else cur.e = i; });
+      runs.forEach(r => { if (!r.section) return; const bx = xM + r.s * colW, bw = (r.e - r.s + 1) * colW; parts.push(`<rect x="${bx.toFixed(1)}" y="${titleH}" width="${bw.toFixed(1)}" height="${secH - 6}" rx="4" fill="${tint(colFor({ section: r.section }))}"/><text x="${(bx + bw / 2).toFixed(1)}" y="${titleH + (secH - 6) / 2 + 4}" text-anchor="middle" fill="${HEAD}" font-family="${FONT}" font-size="10.5" font-weight="bold">${esc(r.section)}</text>`); });
+    }
+    parts.push(`<line x1="${xM}" y1="${axisY}" x2="${W - xM}" y2="${axisY}" stroke="${HEAD}" stroke-width="2.5"/>`);
+    P.forEach((p, i) => {
+      const x = X(i), col = colFor(p);
+      parts.push(`<text x="${x.toFixed(1)}" y="${(axisY - 12).toFixed(1)}" text-anchor="middle" fill="${HEAD}" font-family="${FONT}" font-size="11.5" font-weight="bold">${esc(p.time)}</text>`);
+      parts.push(`<circle cx="${x.toFixed(1)}" cy="${axisY}" r="6" fill="${col}" stroke="#fff" stroke-width="2"/>`);
+      if (p.events.length) parts.push(`<line x1="${x.toFixed(1)}" y1="${axisY + 6}" x2="${x.toFixed(1)}" y2="${evTop - 2}" stroke="${BORDER}" stroke-width="1"/>`);
+      const bw = colW - 14;
+      p.events.forEach((ev, j) => {
+        const ey = evTop + j * (evH + evGap), bx = x - bw / 2;
+        parts.push(`<rect x="${bx.toFixed(1)}" y="${ey.toFixed(1)}" width="${bw.toFixed(1)}" height="${evH}" rx="5" fill="${tint(col)}" stroke="${col}" stroke-width="1.2"/>`);
+        const ln = wrapLine(ev, bw - 10, 9.5).slice(0, 2), off = ln.length === 1 ? 4 : -1;
+        ln.forEach((s, k) => parts.push(`<text x="${x.toFixed(1)}" y="${(ey + evH / 2 + off + k * 11).toFixed(1)}" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="9.5">${esc(s)}</text>`));
+      });
+    });
+    const H = evTop + maxEv * (evH + evGap) + 8;
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  }
+
   function render(kind, code) {
     try {
       HEAD = themeColor("--brand", "#1e3a5f"); ACCENT = themeColor("--accent", "#2563eb");
@@ -595,6 +766,9 @@
       if (kind === "state") { return flow(parseState(code)); }
       if (kind === "class") { return classRender(parseClass(code)); }
       if (kind === "gantt") { return gantt(parseGantt(code)); }
+      if (kind === "journey") { return journey(parseJourney(code)); }
+      if (kind === "mindmap") { return mindmap(parseMindmap(code)); }
+      if (kind === "timeline") { return timeline(parseTimeline(code)); }
     } catch (e) { return `<pre>diagram error: ${esc(e && e.message || e)}</pre>`; }
     return "";
   }
@@ -608,10 +782,13 @@
     if (/^stateDiagram(-v2)?\b/.test(t)) return "state";
     if (/^classDiagram\b/.test(t)) return "class";
     if (/^gantt\b/.test(t)) return "gantt";
+    if (/^journey\b/.test(t)) return "journey";
+    if (/^mindmap\b/.test(t)) return "mindmap";
+    if (/^timeline\b/.test(t)) return "timeline";
     return null;
   }
 
-  const api = { erd, flow, sequence, pie, parsePie, parseState, classRender, parseClass, gantt, parseGantt, parseEr, parseFlow, parseSeq, render, detectKind };
+  const api = { erd, flow, sequence, pie, parsePie, parseState, classRender, parseClass, gantt, parseGantt, journey, parseJourney, mindmap, parseMindmap, timeline, parseTimeline, parseEr, parseFlow, parseSeq, render, detectKind };
   root.DIAG = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : this);
