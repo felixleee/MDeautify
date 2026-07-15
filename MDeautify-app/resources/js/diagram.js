@@ -513,29 +513,49 @@
     }
     let cursor = 0; tasks.forEach(t => { if (t.s == null) { t.s = cursor; t.e = cursor + durDays(t.dur); } cursor = Math.max(cursor, t.e); });
     const minD = Math.min.apply(null, tasks.map(t => t.s)), maxD = Math.max.apply(null, tasks.map(t => t.e)), span = Math.max(1, maxD - minD);
-    const labelW = 190, chartX = labelW + 12, chartW = 560, rowH = 24, top = parsed.title ? 52 : 24;
-    const X = d => chartX + (d - minD) / span * chartW;
     const colorOf = t => t.status === "done" ? "#94a3b8" : t.status === "active" ? ACCENT : t.status === "crit" ? "#dc2626" : HEAD;
-    const parts = []; let y = top, curSec = null;
-    if (parsed.title) parts.push(`<text x="400" y="30" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="16" font-weight="bold">${esc(parsed.title)}</text>`);
-    const bodyTop = y;
-    tasks.forEach(t => {
-      if (t.section !== curSec) { curSec = t.section; if (curSec) { parts.push(`<text x="12" y="${y + 15}" fill="${INK}" font-family="${FONT}" font-size="12" font-weight="bold">${esc(curSec)}</text>`); y += rowH; } }
-      const ry = y;
-      parts.push(`<text x="${labelW}" y="${ry + 16}" text-anchor="end" fill="${INK}" font-family="${FONT}" font-size="11">${esc(t.name)}</text>`);
-      if (t.milestone) { const mx = X(t.s), my = ry + rowH / 2, rr = 7; parts.push(`<polygon points="${mx.toFixed(1)},${my - rr} ${(mx + rr).toFixed(1)},${my} ${mx.toFixed(1)},${my + rr} ${(mx - rr).toFixed(1)},${my}" fill="${colorOf(t)}"/>`); }
-      else { const bx = X(t.s), bw = Math.max(3, X(t.e) - X(t.s)); parts.push(`<rect x="${bx.toFixed(1)}" y="${ry + 4}" width="${bw.toFixed(1)}" height="${rowH - 8}" rx="3" fill="${colorOf(t)}" opacity="${t.status === 'done' ? 0.55 : 0.92}"/>`); }
-      y += rowH;
-    });
-    const bodyBottom = y, grid = [];
+    // 섹션 헤더 + 작업 행 목록
+    const rows = []; let curSec = null;
+    tasks.forEach(t => { if (t.section !== curSec) { curSec = t.section; if (curSec) rows.push({ type: "sec", name: curSec }); } rows.push({ type: "task", t }); });
+    // 표 레이아웃
+    const x0 = 10, tableW = 780, labelW = 195, chartX = x0 + labelW, chartW = tableW - labelW;
+    const titleH = parsed.title ? 40 : 8, headH = 28, rowH = 28;
+    const tableTop = titleH, bodyTop = tableTop + headH, bodyBottom = bodyTop + rows.length * rowH, tableH = headH + rows.length * rowH;
+    const X = d => chartX + (d - minD) / span * chartW;
     let step = Math.ceil(span / 8); if (step < 1) step = 1;
-    for (let d = minD; d <= maxD + 0.001; d += step) {
-      const gx = X(d);
-      grid.push(`<line x1="${gx.toFixed(1)}" y1="${bodyTop - 4}" x2="${gx.toFixed(1)}" y2="${bodyBottom}" stroke="#e2e8f0" stroke-width="1"/>`);
-      grid.push(`<text x="${gx.toFixed(1)}" y="${bodyBottom + 16}" text-anchor="middle" fill="#64748b" font-family="${MONO}" font-size="9">${fromDay(Math.round(d))}</text>`);
-    }
-    const h = bodyBottom + 30;
-    return `<svg viewBox="0 0 800 ${h}" width="800" height="${h}" xmlns="http://www.w3.org/2000/svg">${grid.join("")}${parts.join("")}</svg>`;
+    const ticks = []; for (let d = minD; d <= maxD + 0.001; d += step) ticks.push(Math.round(d));
+    const parts = [];
+    if (parsed.title) parts.push(`<text x="400" y="26" text-anchor="middle" fill="${INK}" font-family="${FONT}" font-size="16" font-weight="bold">${esc(parsed.title)}</text>`);
+    // 행 배경(섹션 밴드 · 지브라)
+    rows.forEach((r, i) => { const ry = bodyTop + i * rowH; if (r.type === "sec") parts.push(`<rect x="${x0}" y="${ry}" width="${tableW}" height="${rowH}" fill="#eef2f7"/>`); else if (i % 2 === 1) parts.push(`<rect x="${x0}" y="${ry}" width="${tableW}" height="${rowH}" fill="#f8fafc"/>`); });
+    // 세로 그리드(타임라인)
+    ticks.forEach(d => { const gx = X(d); parts.push(`<line x1="${gx.toFixed(1)}" y1="${bodyTop}" x2="${gx.toFixed(1)}" y2="${bodyBottom}" stroke="#e5e9f0" stroke-width="1"/>`); });
+    // 가로 행 구분선
+    for (let i = 1; i < rows.length; i++) { const ly = bodyTop + i * rowH; parts.push(`<line x1="${x0}" y1="${ly}" x2="${x0 + tableW}" y2="${ly}" stroke="#eef1f5" stroke-width="1"/>`); }
+    // 헤더(네이비, 위 모서리만 라운드)
+    parts.push(`<rect x="${x0}" y="${tableTop}" width="${tableW}" height="${headH}" rx="6" fill="${HEAD}"/><rect x="${x0}" y="${tableTop + headH - 8}" width="${tableW}" height="8" fill="${HEAD}"/>`);
+    parts.push(`<text x="${x0 + 12}" y="${tableTop + headH / 2 + 4}" fill="#fff" font-family="${FONT}" font-size="11" font-weight="bold">작업</text>`);
+    ticks.forEach(d => { const gx = X(d); parts.push(`<text x="${gx.toFixed(1)}" y="${tableTop + headH / 2 + 4}" text-anchor="middle" fill="#cbd8ea" font-family="${MONO}" font-size="9">${fromDay(d)}</text>`); });
+    // 행 내용(섹션명 · 작업명 · 막대/마일스톤)
+    rows.forEach((r, i) => {
+      const ry = bodyTop + i * rowH, mid = ry + rowH / 2;
+      if (r.type === "sec") { parts.push(`<text x="${x0 + 10}" y="${mid + 4}" fill="${HEAD}" font-family="${FONT}" font-size="11.5" font-weight="bold">${esc(r.name)}</text>`); return; }
+      const t = r.t, col = colorOf(t);
+      parts.push(`<text x="${chartX - 10}" y="${mid + 4}" text-anchor="end" fill="${INK}" font-family="${FONT}" font-size="11">${esc(t.name)}</text>`);
+      if (t.milestone) { const mx = X(t.s), rr = 7; parts.push(`<polygon points="${mx.toFixed(1)},${mid - rr} ${(mx + rr).toFixed(1)},${mid} ${mx.toFixed(1)},${mid + rr} ${(mx - rr).toFixed(1)},${mid}" fill="${col}" stroke="#fff" stroke-width="1"/>`); }
+      else { const bx = X(t.s), bw = Math.max(4, X(t.e) - X(t.s)); parts.push(`<rect x="${bx.toFixed(1)}" y="${ry + 6}" width="${bw.toFixed(1)}" height="${rowH - 12}" rx="3" fill="${col}" fill-opacity="${t.status === 'done' ? 0.5 : 0.95}" stroke="rgba(15,23,42,0.15)" stroke-width="0.8"/>`); }
+    });
+    // 좌측 열 구분선 + 외곽 테두리
+    parts.push(`<line x1="${chartX}" y1="${bodyTop}" x2="${chartX}" y2="${bodyBottom}" stroke="#cbd5e1" stroke-width="1"/>`);
+    parts.push(`<rect x="${x0}" y="${tableTop}" width="${tableW}" height="${tableH}" rx="6" fill="none" stroke="#cbd5e1" stroke-width="1.3"/>`);
+    // 범례(사용된 상태만)
+    const seen = {}; tasks.forEach(t => { if (t.milestone) { seen.ms = 1; return; } seen[t.status || "def"] = 1; });
+    const leg = []; if (seen.def) leg.push(["일반", HEAD]); if (seen.active) leg.push(["진행중", ACCENT]); if (seen.done) leg.push(["완료", "#94a3b8"]); if (seen.crit) leg.push(["중요", "#dc2626"]);
+    let lx = x0 + 2; const ly = bodyBottom + 22;
+    leg.forEach(it => { parts.push(`<rect x="${lx}" y="${ly - 9}" width="11" height="11" rx="2" fill="${it[1]}"/><text x="${lx + 16}" y="${ly}" fill="#64748b" font-family="${FONT}" font-size="10">${it[0]}</text>`); lx += 26 + textW(it[0], 10); });
+    if (seen.ms) { const my = ly - 3.5; parts.push(`<polygon points="${(lx + 5).toFixed(1)},${my - 6} ${(lx + 11).toFixed(1)},${my} ${(lx + 5).toFixed(1)},${my + 6} ${(lx - 1).toFixed(1)},${my}" fill="${HEAD}"/><text x="${lx + 16}" y="${ly}" fill="#64748b" font-family="${FONT}" font-size="10">마일스톤</text>`); }
+    const h = ly + 14;
+    return `<svg viewBox="0 0 800 ${h}" width="800" height="${h}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
   }
 
   function render(kind, code) {
