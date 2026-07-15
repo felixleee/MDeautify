@@ -20,6 +20,11 @@ window_state.config.json
 # ── 구버전 (Season3.5만 유지) ──
 MDeautify_Season3.html
 
+# ── 개인 파일 (저장소에 올리지 않음) ──
+*.pptx
+~$*.pptx
+SKILL.md
+
 # ── OS 부산물 ──
 Thumbs.db
 .DS_Store
