@@ -118,7 +118,7 @@ if(!marked.__delFix){marked.__delFix=1;marked.use({tokenizer:{del(src){var m=/^~
 /* KaTeX 수식: 블록 $$…$$ (display) · 인라인 $…$ . $5 같은 통화 오인식은 앞뒤 공백/숫자 규칙으로 회피.
    throwOnError:false → 오류는 KaTeX가 붉게 표시(문서 렌더 중단 안 함). 코드블록/인라인코드 안은 marked가 먼저 처리하므로 미영향. */
 if(!marked.__katexExt&&typeof katex!=="undefined"){marked.__katexExt=1;marked.use({extensions:[
-  {name:"blockMath",level:"block",start:function(s){return s.indexOf("$$");},
+  {name:"blockMath",level:"block",start:function(s){var m=/(?:^|\n)[ \t]*\$\$/.exec(s);return m?m.index+m[0].length-2:-1;},
    tokenizer:function(src){var m=/^\$\$([\s\S]+?)\$\$(?:\n+|$)/.exec(src);if(m)return {type:"blockMath",raw:m[0],text:m[1].trim()};},
    renderer:function(t){try{return "<div class=\"katex-block\">"+katex.renderToString(t.text,{displayMode:true,throwOnError:false})+"</div>";}catch(e){return "<pre>KaTeX: "+esc(String(e&&e.message||e))+"</pre>";}}},
   {name:"inlineMath",level:"inline",start:function(s){return s.indexOf("$");},
