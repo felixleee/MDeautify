@@ -888,7 +888,7 @@ window.__resolveLocalImages=async function(src){
         st=f.status==="ok"?["st-ok","✓ 사용중"]:f.status==="missing"?["st-bad","✗ 식별안됨"]:["st-ok","● 사용가능"],
         inPool=window.__drop&&Object.prototype.hasOwnProperty.call(window.__drop,f.name),
         act=f.status==="missing"?"<button class='fp-rm-btn' type='button' data-rm='"+esc(f.name)+"' title='MD에서 이 이미지 참조를 삭제: "+esc(f.name)+"'>참조 삭제</button>":"<button class='fp-ins-btn' type='button' data-ins='"+esc(f.name)+"' title='커서 위치에 삽입: "+esc(f.name)+"'>삽입</button>";
-        h+="<div class='fp-row' title='"+esc(f.name)+"'><span class='fp-ico'>🖼️</span><span class='fp-name'>"+esc(f.name)+"</span><span class='fp-st "+st[0]+"'>"+st[1]+"</span>"+act+(inPool?"<button class='fp-del-btn' type='button' data-del='"+esc(f.name)+"' title='목록에서 제거: "+esc(f.name)+"' aria-label='삭제'>✕</button>":"<span class='fp-del-ph'></span>")+"</div>";}
+        h+="<div class='fp-row' title='"+esc(f.name)+"'><span class='fp-ico'>🖼️</span><span class='fp-name'>"+esc(f.name)+"</span><span class='fp-st "+st[0]+"'>"+st[1]+"</span>"+act+(inPool?"<button class='fp-del-btn' type='button' data-del='"+esc(f.name)+"' title='"+(f.status==="ok"?"제거 (문서의 참조도 함께 삭제): ":"목록에서 제거: ")+esc(f.name)+"' aria-label='삭제'>✕</button>":"<span class='fp-del-ph'></span>")+"</div>";}
       h+="</div>";
     }else h+="<div class='fp-sec'><div class='fp-empty'>참조된 이미지 없음</div></div>";
     if(anyMissing)h+="<div class='fp-hint'>식별 안 된 이미지가 있어요. <b>‘파일 열기’</b>로 이미지를 넣거나, <b>이미지</b>(또는 폴더째) 끌어다 놓으면 표시됩니다.</div>";
@@ -916,8 +916,19 @@ window.__resolveLocalImages=async function(src){
     if(e.target.closest&&e.target.closest(".fp-zip-btn")){if(window.__exportZip)window.__exportZip();return;}
     if(e.target.closest&&e.target.closest(".fp-link-btn")){if(window.__saveMd)window.__saveMd();return;}   /* 파일 연결 = 저장 위치 지정(=Ctrl+S 경로없음 경로) → __mdPath 설정 후 배지 갱신 */
     var del=e.target.closest&&e.target.closest(".fp-del-btn");
-    if(del){var dn=del.getAttribute("data-del");if(dn&&window.__drop)delete window.__drop[dn];  /* 풀에서 제거 → 재렌더로 목록/상태 갱신(팝오버는 열린 채) */
-      var cur=document.getElementById("rawInput");if(typeof renderPreview==="function")renderPreview(cur?cur.value:(window.__lastText||""),true);else if(window.__renderFileBadge)window.__renderFileBadge();return;}
+    if(del){var dn=del.getAttribute("data-del");if(!dn||!window.__drop)return;
+      var inUse=(window.__imgFiles||[]).some(function(f){return f.name===dn&&f.status==="ok";});
+      var doRemove=function(){
+        delete window.__drop[dn];                                   /* 풀에서 제거 */
+        if(inUse&&typeof removeRefFromMd==="function"){removeRefFromMd(dn);}  /* 문서의 모든 참조도 삭제(내부에서 재렌더) */
+        else{var cur=document.getElementById("rawInput");if(typeof renderPreview==="function")renderPreview(cur?cur.value:(window.__lastText||""),true);else if(window.__renderFileBadge)window.__renderFileBadge();}
+      };
+      if(inUse){   /* 사용중 → 문서 깨짐 방지: 확인 후 참조까지 완전 제거 */
+        var msg="'"+dn+"' 은(는) 문서에서 사용 중입니다.\n목록에서 제거하면 문서의 모든 참조도 함께 삭제됩니다. 계속할까요?";
+        if(window.__appConfirm){window.__appConfirm({title:"이미지 제거",message:msg,okText:"참조까지 삭제",cancelText:"취소",danger:true}).then(function(ok){if(ok)doRemove();});}
+        else{if(window.confirm(msg))doRemove();}
+      }else{doRemove();}   /* 사용가능(미참조) → 바로 풀에서 제거 */
+      return;}
     var rm=e.target.closest&&e.target.closest(".fp-rm-btn");
     if(rm){var rn=rm.getAttribute("data-rm");if(rn)removeRefFromMd(rn);return;}
     var btn=e.target.closest&&e.target.closest(".fp-ins-btn");if(!btn)return;var name=btn.getAttribute("data-ins");if(!name)return;
