@@ -534,7 +534,7 @@ setIco();})();
 /* 편집 중엔 왼쪽 미러(색상 강조)만 즉시 갱신하고, 무거운 미리보기 재생성은 입력을 멈춘 뒤 3초 후 1회만 실행
    → 타이핑 중 오른쪽 미리보기가 자주 재분할되며 깜빡이던 문제 방지. */
 var EDIT_DELAY=2000;
-ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);},EDIT_DELAY);});
+ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);if(window.__autoSave&&window.__autoSaveMd)window.__autoSaveMd();},EDIT_DELAY);});
 function syncMirror(){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
 ta.addEventListener("scroll",syncMirror);
 /* 커서 이동(방향키·클릭·타이핑)으로 textarea 가 자동 스크롤될 때 'scroll' 이벤트가 누락되는 엔진이 있어
@@ -549,6 +549,7 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
    - 브라우저(NL_PORT 없음): 파일시스템 쓰기 불가 → .md 다운로드로 폴백 */
 (function(){
   var ta=document.getElementById("rawInput");if(!ta)return;
+  var savedText=null;   /* 마지막으로 저장된 내용(자동 저장 중복 쓰기 방지) */
   /* 짧은 토스트(이미지 추가 알림 #fbToast 요소·CSS 재사용) */
   function toast(msg){var editor=document.getElementById("editor");if(!editor)return;var t=document.getElementById("fbToast");if(!t){t=document.createElement("div");t.id="fbToast";editor.appendChild(t);}t.textContent=msg;t.classList.remove("show");void t.offsetWidth;t.classList.add("show");clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},1600);}
   window.__saveMd=async function(){
@@ -570,11 +571,21 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
           if(window.__renderFileBadge)window.__renderFileBadge();
         }
         await Neutralino.filesystem.writeFile(path,text);
+        savedText=text;
         toast("저장됨");
       }catch(e){try{Neutralino.debug.log("[save] "+e);}catch(_){}if(window.__appAlert)window.__appAlert("저장 중 문제가 발생했습니다.","오류");else alert("저장 중 문제가 발생했습니다.");}
     }else{   /* 브라우저: 다운로드 */
       try{var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=defName;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);toast("다운로드됨");}catch(e){}
     }
+  };
+  /* 자동 저장: 편집 멈춘 뒤 미리보기 갱신 시점에 호출. EXE + 경로 있을 때만, 변경 있을 때만 조용히 저장. */
+  window.__autoSaveMd=async function(){
+    if(!document.body.classList.contains("loaded"))return;
+    var isExe=(typeof window.NL_PORT!=="undefined"&&typeof window.Neutralino!=="undefined");
+    if(!isExe||!window.__mdPath)return;              /* 브라우저 또는 경로 미확보 → 조용히 스킵 */
+    var text=ta.value; if(text===savedText)return;   /* 변경 없음 → 쓰기 생략 */
+    try{await Neutralino.filesystem.writeFile(window.__mdPath,text);savedText=text;toast("자동 저장됨");}
+    catch(e){try{Neutralino.debug.log("[autosave] "+e);}catch(_){}}   /* 실패는 조용히 무시 */
   };
   document.addEventListener("keydown",function(e){
     if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&(e.key==="s"||e.key==="S")){e.preventDefault();window.__saveMd();}

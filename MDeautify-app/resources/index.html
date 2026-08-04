@@ -140,6 +140,11 @@
               <label for='tmDark'>시스템 테마</label>
               <input type='checkbox' id='tmDark' class='tm-switch'>
             </div>
+            <div class='tm-opt'>
+              <label for='tmAutoSave' title='켜면 편집을 멈춘 뒤 미리보기가 갱신될 때 원본 .md 파일에도 자동 저장됩니다. 파일이 연결돼 있을 때만 동작합니다.'>자동 저장</label>
+              <input type='checkbox' id='tmAutoSave' class='tm-switch'>
+            </div>
+            <div class='tm-opt-note'>파일이 연결돼 있을 때, 편집 후 자동으로 원본에 저장합니다.</div>
           </div>
           <div class='tm-about' id='tmAbout' hidden>
             <div class='tm-sec-head'><span class='tm-sec-title'>정보 · 업데이트</span></div>
@@ -173,7 +178,7 @@
         </div>
       </div>
       <div id='main'>
-        <section id='editor'><pre id='raw' aria-hidden='true'></pre><textarea id='rawInput' spellcheck='false' wrap='soft' placeholder='여기에서 마크다운을 직접 수정할 수 있습니다.'></textarea><button id='fileBadge' type='button' hidden title='불러온 파일 보기'><svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8'/></svg><span id='fileBadgeN'>0</span><span id='fileBadgeWarn' aria-hidden='true' title='식별 안 된 이미지가 있습니다'>!</span></button><div id='filePop' hidden></div></section>
+        <section id='editor'><pre id='findHl' aria-hidden='true'></pre><pre id='raw' aria-hidden='true'></pre><textarea id='rawInput' spellcheck='false' wrap='soft' placeholder='여기에서 마크다운을 직접 수정할 수 있습니다.'></textarea><button id='fileBadge' type='button' hidden title='불러온 파일 보기'><svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8'/></svg><span id='fileBadgeN'>0</span><span id='fileBadgeWarn' aria-hidden='true' title='식별 안 된 이미지가 있습니다'>!</span></button><div id='filePop' hidden></div><div id='findBar' hidden role='search' aria-label='찾기 및 바꾸기'><button id='fbToggle' type='button' class='fb-toggle' title='바꾸기 표시/숨김' aria-expanded='false' aria-label='바꾸기 표시/숨김'>&#9654;</button><div class='fb-fields'><div class='fb-row'><input id='fbFind' type='text' placeholder='찾기' spellcheck='false' autocomplete='off'><span id='fbCount' class='fb-count'>0/0</span><button id='fbCase' type='button' class='fb-tgl' title='대소문자 구분' aria-pressed='false'>Aa</button><button id='fbPrev' type='button' class='fb-ico' title='이전 (Shift+Enter)' aria-label='이전'>&#9650;</button><button id='fbNext' type='button' class='fb-ico' title='다음 (Enter)' aria-label='다음'>&#9660;</button><button id='fbClose' type='button' class='fb-ico' title='닫기 (Esc)' aria-label='닫기'>&#10005;</button></div><div class='fb-row fb-repl-row'><input id='fbRepl' type='text' placeholder='바꾸기' spellcheck='false' autocomplete='off'><button id='fbReplOne' type='button' class='fb-btn' title='변경 (Enter)'>변경</button><button id='fbReplAll' type='button' class='fb-btn' title='모두 변경'>모두 변경</button></div></div></div></section>
         <div id='splitter'>
           <button id='foldBtn' type='button' title='원본 접기/펼치기' aria-label='원본 접기/펼치기'><span class='fold-ico'>‹</span></button>
         </div>
@@ -204,9 +209,11 @@
       <script src="js/settings/font.js"></script>
       <script src="js/settings/size.js"></script>
       <script src="js/settings/pagebreak.js"></script>
+      <script src="js/settings/autosave.js"></script>
       <script src="js/settings/toc.js"></script>
       <script src="js/settings/footer.js"></script>
       <script src="js/settings/header.js"></script>
       <script src="js/export-pdf.js"></script>
+      <script src="js/find.js"></script>
     </body>
 </html>
