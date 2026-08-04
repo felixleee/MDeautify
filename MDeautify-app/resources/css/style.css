@@ -147,6 +147,7 @@ body.loaded #drop{display:none;}
 #findHl mark.fh{background:color-mix(in srgb, #f4c430 50%, transparent);color:transparent;-webkit-text-fill-color:transparent;border-radius:2px;}
 #findHl mark.fh.cur{background:color-mix(in srgb, #ff8c00 80%, transparent);}
 /* ===== 찾기/바꾸기 바 (Ctrl+F / Ctrl+H) ===== */
+#findBar[hidden]{display:none;}
 #findBar{position:absolute;top:8px;right:16px;z-index:6;display:flex;flex-direction:row;align-items:flex-start;gap:3px;background:var(--ui-editor-bg);border:1px solid color-mix(in srgb, var(--ui-editor-fg) 22%, transparent);border-radius:8px;padding:7px 8px;box-shadow:0 4px 14px rgba(0,0,0,.22);}
 #findBar .fb-fields{display:flex;flex-direction:column;gap:5px;}
 #findBar .fb-toggle{flex:0 0 auto;align-self:stretch;display:flex;align-items:center;justify-content:center;width:18px;font-size:9px;border:0;background:transparent;color:color-mix(in srgb, var(--ui-editor-fg) 60%, transparent);cursor:pointer;border-radius:5px;padding:0;transition:transform .12s;}
