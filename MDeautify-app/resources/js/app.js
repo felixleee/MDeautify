@@ -704,7 +704,8 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
   }catch(e){log("[open] "+e);}}
   window.__nativeOpen=nativeOpen;
   /* 실행 인자로 넘어온 .md 자동 열기(더블클릭/연결앱/아이콘에 드롭 시 경로와 함께 실행됨) */
-  try{var a=window.NL_ARGS||[];for(var i=1;i<a.length;i++){if(isMdPath(a[i])&&isAbs(a[i])){openMd(a[i]);break;}}}catch(e){}
+  try{var hasRecover=false;try{hasRecover=!!localStorage.getItem("mdeautify_recover");}catch(_){}  /* 연결끊김 복구 대기 중이면 인자 파일 열기 스킵(복구본이 우선) */
+    if(!hasRecover){var a=window.NL_ARGS||[];for(var i=1;i<a.length;i++){if(isMdPath(a[i])&&isAbs(a[i])){openMd(a[i]);break;}}}}catch(e){}
 })();
 /* ===== 통합 로컬 이미지 해석기 (브라우저·EXE 공통) =====
    각 <img> 로컬 경로를 (1) 드롭된 파일 맵(window.__drop) → (2) EXE 네이티브 FS(window.__nativeResolve) 순으로 해석. */
