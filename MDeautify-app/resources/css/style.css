@@ -318,9 +318,9 @@ body.loaded #fileBadge{display:inline-flex;}
 .content pre .thl-lit{color:#569cd6;}
 .content table{width:100%;border-collapse:collapse;margin:10px 0;font-size:calc(var(--doc-size) * 0.857);table-layout:auto;}
 .content thead{display:table-header-group;}
-.content th{background:var(--brand);color:#fff;text-align:left;padding:6px 8px;font-size:calc(var(--doc-size) * 0.857);word-break:break-word;overflow-wrap:anywhere;}
-.content td{border:1px solid #e2e8f0;padding:6px 8px;vertical-align:top;word-break:break-word;overflow-wrap:anywhere;}
-.content td code{word-break:break-all;}
+.content th{background:var(--brand);color:#fff;text-align:left;padding:6px 8px;font-size:calc(var(--doc-size) * 0.857);word-break:keep-all;overflow-wrap:break-word;}
+.content td{border:1px solid #e2e8f0;padding:6px 8px;vertical-align:top;word-break:keep-all;overflow-wrap:break-word;}
+.content td code,.content td a,.content th a{word-break:break-all;overflow-wrap:anywhere;}   /* 셀 안 긴 코드·URL(공백없는 토큰)은 끊어서 칸 넘침 방지(한글 keep-all 과 별개) */
 .content tbody tr:nth-child(even){background:#f8fafc;}
 .content blockquote{background:#eff6ff;background:color-mix(in srgb, var(--accent) 9%, #fff);border-left:4px solid var(--accent);padding:8px 12px;border-radius:4px;margin:12px 0;color:var(--brand);}
 .content blockquote p{margin:0;}
