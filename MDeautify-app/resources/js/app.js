@@ -198,7 +198,7 @@ if(window.__h2NewPage){var _blk=src.querySelectorAll(".content > *");var _firstI
 /* 언어 지정 코드블록만 구문 강조(언어 없는 블록=예시는 단색 유지 → 예시/실제 구별됨). mermaid는 위에서 이미 처리됨 */
 src.querySelectorAll("pre code[class*='language-']").forEach(function(c){var mm=(c.className||"").match(/language-([\w#+.-]+)/);c.innerHTML=hlCode(c.textContent,mm?mm[1]:"");});
 var fixed={"상태":"6%","id":"7%","tier":"6%","심각도":"9%","담당":"8%"};
-src.querySelectorAll(".content table").forEach(function(t){var ths=t.querySelectorAll("tr th");if(!ths.length)return;var cg=document.createElement("colgroup");ths.forEach(function(th){var h=th.textContent.trim().toLowerCase().replace(/\s+/g,"");var col=document.createElement("col");var w=null;if(h.indexOf("화면")>-1||h.indexOf("파일")>-1)w="26%";else if(fixed[h])w=fixed[h];if(w){col.style.width=w;th.style.width=w;}cg.appendChild(col);});t.insertBefore(cg,t.firstChild);});
+src.querySelectorAll(".content table").forEach(function(t){var ths=t.querySelectorAll("tr th");if(!ths.length)return;var cg=document.createElement("colgroup");ths.forEach(function(th){var h=th.textContent.trim().toLowerCase().replace(/\s+/g,"");var col=document.createElement("col");var w=null;if(h==="화면"||h==="파일")w="26%";else if(fixed[h])w=fixed[h];if(w){col.style.width=w;th.style.width=w;}cg.appendChild(col);});t.insertBefore(cg,t.firstChild);});
 /* 큰 표(>=6행)는 제목과 함께 다음 페이지에서 시작 → 페이지 하단에서 잘려 시작하는 것 방지 */
 document.title=title||(window.__fname||"document");
 /* 스크롤 동기화(방식 B): 최상위 블록마다 원본 줄번호를 data-sl 로 태깅.
