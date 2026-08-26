@@ -313,9 +313,12 @@ function runPaged(src,keepScroll){
   function dropStaging(){if(staging&&staging.parentNode)staging.parentNode.removeChild(staging);staging=null;}
   function swapIn(){pages.innerHTML="";while(staging.firstChild)pages.appendChild(staging.firstChild);dropStaging();}
   function fail(err){if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();}
+  /* 콘텐츠 맨 앞에 <style> 태그를 붙이면 Paged.js 가 첫 페이지를 복제하는 버그가 있다(표지 없는 문서에서 발현).
+     → PAGED_CSS 는 스타일시트(blobUrl)로만 넘기고, blob 생성 실패 시에만 인라인 <style> 폴백. */
+  var content=blobUrl?src.innerHTML:("<style>"+PAGED_CSS+"</style>"+src.innerHTML);
   try{
     var prev=new window.PagedModule.Previewer();
-    prev.preview("<style>"+PAGED_CSS+"</style>"+src.innerHTML, blobUrl?[blobUrl]:[], staging).then(function(flow){
+    prev.preview(content, blobUrl?[blobUrl]:[], staging).then(function(flow){
       swapIn();
       repeatTableHeaders(pages);
       if(typeof applyFooter==="function")applyFooter();
