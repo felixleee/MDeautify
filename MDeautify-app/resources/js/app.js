@@ -345,19 +345,39 @@ runPaged(src,keepScroll);
 /* 파일 로드 등: 에디터(textarea+미러)에 내용을 채우고 미리보기도 처음부터 생성 */
 function renderMarkdown(text){
 var ta=document.getElementById("rawInput");if(ta){ta.value=text;ta.scrollTop=0;}
+if(window.__markClean)window.__markClean();   /* 새 문서 로드 = 저장 기준선 리셋(변경감지 초기화) */
 var mirror=document.getElementById("raw");if(mirror){mirror.innerHTML=hlMd(text);mirror.scrollTop=0;}
 renderPreview(text,false);
 }
 function loadFile(file){window.__lastFile=file;window.__mdDir=null;window.__mdPath=null;window.__mdName=file.name||"document";window.__fname=(file.name||"document").replace(/\.(md|markdown|txt)$/i,"");
 var r=new FileReader();r.onload=function(e){renderMarkdown(e.target.result);};r.readAsText(file,"utf-8");}
-/* 이미 문서를 불러온 상태에서 '다른 MD'로 교체하기 전 확인(편집분 유실 경고). 문서가 없으면 바로 진행. */
+/* 다른 MD로 교체하기 전 가드. true=교체 진행 / false=취소.
+   - 문서 없음 또는 저장하지 않은 변경 없음 → 조용히 진행(묻지 않음).
+   - 자동저장 ON + 경로 있음 → 저장만 하고 조용히 진행.
+   - 그 외(저장 안 된 변경 있음) → 저장/버리기/취소 3지선다 모달. */
 window.__confirmReplaceDoc=async function(){
   if(!document.body.classList.contains("loaded"))return true;
-  var msg="이미 불러온 MD가 있어요.\n편집한 내용은 저장되지 않을 수 있습니다.\n다른 파일을 여시겠어요?";
-  if(window.__appConfirm){
-    return await window.__appConfirm({title:"다른 파일 열기",message:msg,okText:"열기",cancelText:"취소"});
+  if(!(window.__isDirty&&window.__isDirty()))return true;   /* 변경 없음 → 바로 교체 */
+  if(window.__autoSave&&window.__mdPath){                    /* 자동저장 켜짐 + 경로 확보 → 저장 후 조용히 진행 */
+    if(window.__saveMd)await window.__saveMd();
+    return true;
   }
-  try{return window.confirm(msg);}catch(e){return true;}
+  if(window.__confirmSave3){
+    var choice=await window.__confirmSave3({
+      title:"저장하고 열기",
+      message:"편집 중인 문서에 저장하지 않은 변경사항이 있어요.\n저장한 뒤 새 문서를 열까요?",
+      saveText:"저장하고 열기",discardText:"저장 안 함",cancelText:"취소"
+    });
+    if(choice==="cancel")return false;
+    if(choice==="save"){
+      var hadPath=!!window.__mdPath;
+      if(window.__saveMd)await window.__saveMd();
+      if(!hadPath&&!window.__mdPath)return false;   /* 경로 없던 문서 → 저장 다이얼로그 취소 = 교체도 취소(유실 방지) */
+      return true;
+    }
+    return true;   /* discard = 저장 안 하고 진행 */
+  }
+  try{return window.confirm("저장하지 않은 변경사항이 있어요. 새 문서를 여시겠어요?");}catch(e){return true;}
 };
 document.getElementById("fileInput").addEventListener("change",function(e){if(e.target.files&&e.target.files.length){if(window.__ingestFiles)window.__ingestFiles(e.target.files);else loadFile(e.target.files[0]);}e.target.value="";});
 document.getElementById("btnOpen").addEventListener("click",function(){if(window.__nativeOpen){window.__nativeOpen();return;}document.getElementById("fileInput").click();});
@@ -554,7 +574,10 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
    - 브라우저(NL_PORT 없음): 파일시스템 쓰기 불가 → .md 다운로드로 폴백 */
 (function(){
   var ta=document.getElementById("rawInput");if(!ta)return;
-  var savedText=null;   /* 마지막으로 저장된 내용(자동 저장 중복 쓰기 방지) */
+  var savedText=null;   /* 마지막으로 저장/로드된 내용(자동 저장 중복 쓰기 방지 + 변경감지 기준선) */
+  /* 변경감지: 현재 편집 내용이 마지막 저장/로드 기준선과 다르면 dirty. 문서 교체 가드가 사용. */
+  window.__markClean=function(){savedText=ta.value;};
+  window.__isDirty=function(){return document.body.classList.contains("loaded")&&ta.value!==savedText;};
   /* 짧은 토스트(이미지 추가 알림 #fbToast 요소·CSS 재사용) */
   function toast(msg){var editor=document.getElementById("editor");if(!editor)return;var t=document.getElementById("fbToast");if(!t){t=document.createElement("div");t.id="fbToast";editor.appendChild(t);}t.textContent=msg;t.classList.remove("show");void t.offsetWidth;t.classList.add("show");clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},1600);}
   window.__saveMd=async function(){
@@ -684,8 +707,8 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
     var abs=isAbs(s)?s.replace(/\//g,"\\"):joinP(window.__mdDir,s);
     try{var du=await readAsDataUrl(abs);return await window.__img.encode(du,mimeOf(abs));}catch(err){log("[img] resolve fail: "+abs);return null;}
   };
-  async function openMd(path){if(window.__confirmReplaceDoc&&!(await window.__confirmReplaceDoc()))return;   /* 다른 MD 교체 전 확인 */
-    try{var text=await Neutralino.filesystem.readFile(path);window.__mdPath=path;window.__mdDir=dirOf(path);  /* __drop(불러온 이미지 목록)은 문서 전환에도 유지 */window.__mdName=baseOf(path);window.__fname=baseOf(path).replace(/\.(md|markdown|txt)$/i,"");renderMarkdown(text);}catch(err){log("[md] open fail: "+path);}}
+  async function openMd(path){if(window.__confirmReplaceDoc&&!(await window.__confirmReplaceDoc()))return false;   /* 다른 MD 교체 전 확인(취소=false) */
+    try{var text=await Neutralino.filesystem.readFile(path);window.__mdPath=path;window.__mdDir=dirOf(path);  /* __drop(불러온 이미지 목록)은 문서 전환에도 유지 */window.__mdName=baseOf(path);window.__fname=baseOf(path).replace(/\.(md|markdown|txt)$/i,"");renderMarkdown(text);return true;}catch(err){log("[md] open fail: "+path);return false;}}
   function isImgPath(p){return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(p);}
   /* "파일 열기" 버튼 → 네이티브 파일창(.md·이미지). MD=문서 열기(기존 그대로) / 이미지=드래그&드랍처럼 풀에 추가 */
   async function nativeOpen(){try{

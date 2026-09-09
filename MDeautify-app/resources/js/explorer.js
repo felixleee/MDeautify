@@ -103,7 +103,13 @@
     d.addEventListener("click",function(ev){
       ev.stopPropagation();
       if(isDir){toggleDir(node);}
-      else if(node.md){selPath=node.path;renderTree();if(window.__openMdPath)window.__openMdPath(node.path);}
+      else if(node.md){
+        if(window.__mdPath&&norm(window.__mdPath)===norm(node.path))return;   /* 이미 열려있는 파일 → 무시 */
+        if(!window.__openMdPath)return;
+        Promise.resolve(window.__openMdPath(node.path)).then(function(ok){   /* 교체 성공 시에만 선택 표시(취소하면 이전 선택 유지) */
+          if(ok){selPath=node.path;renderTree();}
+        });
+      }
       else if(node.img){
         if(!document.body.classList.contains("loaded")){flash("먼저 문서를 열어주세요");return;}
         if(window.__insertImageFromPath)window.__insertImageFromPath(node.path);

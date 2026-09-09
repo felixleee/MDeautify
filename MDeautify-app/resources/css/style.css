@@ -270,6 +270,8 @@ body.loaded #fileBadge{display:inline-flex;}
 #appModal .am-btn{font:inherit;font-size:12.5px;font-weight:700;border-radius:7px;padding:7px 15px;cursor:pointer;transition:background .12s,border-color .12s;}
 #appModal .am-cancel{border:1px solid var(--tm-border);background:transparent;color:var(--tm-fg2);}
 #appModal .am-cancel:hover{border-color:var(--tm-bhover);background:var(--tm-hover-bg);}
+#appModal .am-discard{border:1px solid var(--tm-border);background:transparent;color:var(--tm-fg);}
+#appModal .am-discard:hover{border-color:#dc2626;color:#dc2626;background:var(--tm-hover-bg);}
 #appModal .am-ok{border:1px solid var(--ui-brand-accent);background:var(--ui-brand-accent);color:#fff;}
 #appModal .am-ok:hover{background:color-mix(in srgb,var(--ui-brand-accent) 88%,#000);}
 #appModal .am-ok:focus-visible{outline:2px solid var(--ui-brand-accent);outline-offset:2px;}

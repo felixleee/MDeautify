@@ -62,6 +62,37 @@
       setTimeout(function(){try{okBtn.focus();}catch(e){}},0);
     });
   }
+  /* 3지선다(저장/버리기/취소). resolve("save"|"discard"|"cancel"). Enter=저장, Esc·바깥클릭=취소 */
+  function open3(opts){
+    ensure();
+    var title=opts.title||"",saveText=opts.saveText||"저장",discardText=opts.discardText||"저장 안 함",cancelText=opts.cancelText||"취소";
+    titleEl.textContent=title;titleEl.style.display=title?"":"none";
+    setMsg(msgEl,opts.message||"");
+    btnRow.innerHTML="";
+    prevFocus=document.activeElement;
+    return new Promise(function(resolve){
+      function done(val){
+        overlay.hidden=true;
+        if(keyH)document.removeEventListener("keydown",keyH,true);
+        overlay.onclick=null;
+        if(prevFocus&&prevFocus.focus){try{prevFocus.focus();}catch(e){}}
+        resolve(val);
+      }
+      var cBtn=document.createElement("button");cBtn.type="button";cBtn.className="am-btn am-cancel";cBtn.textContent=cancelText;cBtn.addEventListener("click",function(){done("cancel");});
+      var dBtn=document.createElement("button");dBtn.type="button";dBtn.className="am-btn am-discard";dBtn.textContent=discardText;dBtn.addEventListener("click",function(){done("discard");});
+      var sBtn=document.createElement("button");sBtn.type="button";sBtn.className="am-btn am-ok";sBtn.textContent=saveText;sBtn.addEventListener("click",function(){done("save");});
+      btnRow.appendChild(cBtn);btnRow.appendChild(dBtn);btnRow.appendChild(sBtn);
+      keyH=function(e){
+        if(e.key==="Escape"){e.preventDefault();done("cancel");}
+        else if(e.key==="Enter"){e.preventDefault();done("save");}
+      };
+      document.addEventListener("keydown",keyH,true);
+      overlay.onclick=function(e){if(e.target===overlay)done("cancel");};  /* 바깥 클릭 = 취소 */
+      overlay.hidden=false;
+      setTimeout(function(){try{sBtn.focus();}catch(e){}},0);
+    });
+  }
   window.__appConfirm=function(opts){opts=opts||{};if(opts.cancelText==null)opts.cancelText="취소";return open(opts);};
   window.__appAlert=function(message,title){return open({message:message,title:title||"",okText:"확인"});};
+  window.__confirmSave3=function(opts){return open3(opts||{});};   /* 저장/버리기/취소 3지선다 */
 })();
