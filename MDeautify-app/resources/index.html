@@ -14,10 +14,16 @@
     </head>
     <body>
       <div id='bootSplash' class='boot-splash' aria-hidden='true'>
-        <svg width='44' height='44' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'>
-          <path d='M10 33 V18 L20 28 L30 18 V33' fill='none' stroke='#fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>
-          <path d='M36.5 8 C36.5 12.8 38.7 15 43.5 15 C38.7 15 36.5 17.2 36.5 22 C36.5 17.2 34.3 15 29.5 15 C34.3 15 36.5 12.8 36.5 8 Z' fill='#fff'/>
-        </svg>
+        <div class='boot-inner'>
+          <svg class='boot-logo' width='60' height='60' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'>
+            <rect x='1' y='1' width='46' height='46' rx='12' fill='#7c3aed'/>
+            <path d='M10 33 V18 L20 28 L30 18 V33' fill='none' stroke='#fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/>
+            <path d='M36.5 8 C36.5 12.8 38.7 15 43.5 15 C38.7 15 36.5 17.2 36.5 22 C36.5 17.2 34.3 15 29.5 15 C34.3 15 36.5 12.8 36.5 8 Z' fill='#fff'/>
+          </svg>
+          <div class='boot-word'><span class='boot-hi'>MD</span><span class='boot-rest'>eautify</span></div>
+          <div class='boot-tag'>Markdown → PDF</div>
+          <div class='boot-bar'><i></i></div>
+        </div>
       </div>
       <div id='bar'>
         <span class='brand'>
@@ -29,6 +35,7 @@
           </svg>
           <span class='brand-lock'><span class='brand-title'><span class='m-hi'>MD</span><span class='m-rest'>eautify</span><span class='season'>md2pdf</span></span></span>
         </span>
+        <button id='btnExplorer' title='폴더 탐색기 (Ctrl+B)' aria-label='폴더 탐색기' hidden><svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><rect x='3' y='4' width='18' height='16' rx='2'/><line x1='9' y1='4' x2='9' y2='20'/></svg></button>
         <button id='btnOpenTop' title='MD 파일 열기 · 이미지 넣기'>파일 열기</button>
         <button id='btnTheme' title='PDF 설정'>PDF 설정</button>
         <span class='spacer'></span>
@@ -146,6 +153,14 @@
             </div>
             <div class='tm-opt-note'>파일이 연결돼 있을 때, 편집 후 자동으로 원본에 저장합니다.</div>
           </div>
+          <div class='tm-folders' id='tmFolders' hidden>
+            <div class='tm-sec-head'>
+              <span class='tm-sec-title'>작업 폴더</span>
+              <button type='button' id='stAddFolder' class='st-add-folder'><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/><line x1='12' y1='11' x2='12' y2='17'/><line x1='9' y1='14' x2='15' y2='14'/></svg>폴더 추가</button>
+            </div>
+            <div id='stFolderList' class='st-folder-list'></div>
+            <div class='tm-opt-note'>추가한 폴더는 왼쪽 탐색기에 표시됩니다.</div>
+          </div>
           <div class='tm-about' id='tmAbout' hidden>
             <div class='tm-sec-head'><span class='tm-sec-title'>정보 · 업데이트</span></div>
             <div class='tm-about-row'>
@@ -178,6 +193,22 @@
         </div>
       </div>
       <div id='main'>
+        <aside id='explorer' hidden aria-label='폴더 탐색기'>
+          <div class='ex-head'>
+            <span class='ex-title'>탐색기</span>
+            <span class='ex-spacer'></span>
+            <button id='exRefresh' class='ex-ico' type='button' title='새로고침' aria-label='새로고침'><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M21 12a9 9 0 1 1-2.64-6.36'/><path d='M21 3v6h-6'/></svg></button>
+            <button id='exAdd' class='ex-ico' type='button' title='폴더 추가' aria-label='폴더 추가'><svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/><line x1='12' y1='11' x2='12' y2='17'/><line x1='9' y1='14' x2='15' y2='14'/></svg></button>
+          </div>
+          <div class='ex-body'>
+            <div id='exTree' class='ex-tree'></div>
+            <div id='exEmpty' class='ex-empty' hidden>
+              <div class='ex-empty-txt'>작업 폴더가 아직 없어요.<br>폴더를 추가하면 여기에서 문서를 열 수 있어요.</div>
+              <button id='exAddEmpty' class='ex-empty-btn' type='button'>폴더 추가</button>
+            </div>
+          </div>
+        </aside>
+        <div id='exResizer' title='탐색기 너비 조절' aria-hidden='true'></div>
         <section id='editor'><pre id='findHl' aria-hidden='true'></pre><pre id='raw' aria-hidden='true'></pre><textarea id='rawInput' spellcheck='false' wrap='soft' placeholder='여기에서 마크다운을 직접 수정할 수 있습니다.'></textarea><button id='fileBadge' type='button' hidden title='불러온 파일 보기'><svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8'/></svg><span id='fileBadgeN'>0</span><span id='fileBadgeWarn' aria-hidden='true' title='식별 안 된 이미지가 있습니다'>!</span></button><div id='filePop' hidden></div><div id='findBar' hidden role='search' aria-label='찾기 및 바꾸기'><button id='fbToggle' type='button' class='fb-toggle' title='바꾸기 표시/숨김' aria-expanded='false' aria-label='바꾸기 표시/숨김'>&#9654;</button><div class='fb-fields'><div class='fb-row'><input id='fbFind' type='text' placeholder='찾기' spellcheck='false' autocomplete='off'><span id='fbCount' class='fb-count'>0/0</span><button id='fbCase' type='button' class='fb-tgl' title='대소문자 구분' aria-pressed='false'>Aa</button><button id='fbPrev' type='button' class='fb-ico' title='이전 (Shift+Enter)' aria-label='이전'>&#9650;</button><button id='fbNext' type='button' class='fb-ico' title='다음 (Enter)' aria-label='다음'>&#9660;</button><button id='fbClose' type='button' class='fb-ico' title='닫기 (Esc)' aria-label='닫기'>&#10005;</button></div><div class='fb-row fb-repl-row'><input id='fbRepl' type='text' placeholder='바꾸기' spellcheck='false' autocomplete='off'><button id='fbReplOne' type='button' class='fb-btn' title='변경 (Enter)'>변경</button><button id='fbReplAll' type='button' class='fb-btn' title='모두 변경'>모두 변경</button></div></div></div></section>
         <div id='splitter'>
           <button id='foldBtn' type='button' title='원본 접기/펼치기' aria-label='원본 접기/펼치기'><span class='fold-ico'>‹</span></button>
@@ -216,5 +247,6 @@
       <script src="js/export-pdf.js"></script>
       <script src="js/find.js"></script>
       <script src="js/recover.js"></script>
+      <script src="js/explorer.js"></script>
     </body>
 </html>

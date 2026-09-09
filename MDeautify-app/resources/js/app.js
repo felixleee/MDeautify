@@ -28,7 +28,7 @@ Object.keys(meta).forEach(function(k){if(special[k])return;rows+="<tr><td class=
 if(!title&&!subtitle&&!rows)return"";
 return "<div class='cover'>"+(kicker?"<div class='kicker'>"+esc(kicker)+"</div>":"")+"<h1>"+esc(title)+"</h1><div class='st'>"+esc(subtitle)+"</div><div class='bar'></div>"+(rows?"<table>"+rows+"</table>":"")+"</div>";}
 
-var PAGED_CSS="@page{size:A4;margin:18mm 15mm;@bottom-center{content:counter(page);font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}@top-center{content:' ';font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}}.content h1,.content h2,.content h3,.content h4{break-after:avoid-page;-webkit-column-break-after:avoid;}.content tr,.content img,.content svg,.content figure,.content pre,.content blockquote{break-inside:avoid;}.content table,.content ul,.content ol{break-inside:auto;}.content thead{break-after:avoid;}.pb-before{break-before:page;}.cover{break-after:page;}.toc{break-after:page;}.content p,.content li{orphans:2;widows:2;}";
+var PAGED_CSS="@page{size:A4;margin:18mm 15mm;@bottom-center{content:counter(page);font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}@top-center{content:' ';font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}}.content h1,.content h2,.content h3,.content h4{break-after:avoid-page;-webkit-column-break-after:avoid;}.content tr,.content img,.content svg,.content figure{break-inside:avoid;}.content table,.content ul,.content ol,.content pre,.content blockquote{break-inside:auto;}.content thead{break-after:avoid;}.pb-before{break-before:page;}.cover{break-after:page;}.toc{break-after:page;}.content p,.content li{orphans:2;widows:2;}";
 
 /* 경량 구문 강조기: 주석/문자열/숫자/키워드/함수명 토큰만 span으로 감쌈(정식 파서 아님, 다국어 공통) */
 /* 경량 다국어 구문 강조기(정식 파서 아님). 언어 지정(```lang) 블록에만 적용. 지원: js,ts,c,cpp,cs,php,python,bash,powershell,sql,json / html,css,scss,markdown */
@@ -197,6 +197,8 @@ src.querySelectorAll(".content .pb-marker").forEach(function(mk){var nx=mk.nextE
 if(window.__h2NewPage){var _blk=src.querySelectorAll(".content > *");var _firstIsH2=_blk.length&&_blk[0].tagName==="H2";var _h2=src.querySelectorAll(".content h2");for(var _i=0;_i<_h2.length;_i++){if(_i===0&&_firstIsH2)continue;_h2[_i].classList.add("pb-before");}}
 /* 언어 지정 코드블록만 구문 강조(언어 없는 블록=예시는 단색 유지 → 예시/실제 구별됨). mermaid는 위에서 이미 처리됨 */
 src.querySelectorAll("pre code[class*='language-']").forEach(function(c){var mm=(c.className||"").match(/language-([\w#+.-]+)/);c.innerHTML=hlCode(c.textContent,mm?mm[1]:"");});
+/* 코드블록의 각 줄을 블록 요소(.cl)로 감싼다 → Paged.js 가 페이지 경계에서 줄 단위로 분할(강조 span 든 긴 코드블록이 한 페이지에 갇혀 잘리는 것 방지). 강조 span 은 줄바꿈을 넘지 않으므로 \n 분할이 안전. */
+src.querySelectorAll(".content pre > code").forEach(function(c){var h=c.innerHTML.replace(/\n$/,"");c.innerHTML=h.split("\n").map(function(ln){return "<span class='cl'>"+(ln===""?"​":ln)+"</span>";}).join("");});
 var fixed={"상태":"6%","id":"7%","tier":"6%","심각도":"9%","담당":"8%"};
 src.querySelectorAll(".content table").forEach(function(t){var ths=t.querySelectorAll("tr th");if(!ths.length)return;var cg=document.createElement("colgroup");ths.forEach(function(th){var h=th.textContent.trim().toLowerCase().replace(/\s+/g,"");var col=document.createElement("col");var w=null;if(h==="화면"||h==="파일")w="26%";else if(fixed[h])w=fixed[h];if(w){col.style.width=w;th.style.width=w;}cg.appendChild(col);});t.insertBefore(cg,t.firstChild);});
 /* 큰 표(>=6행)는 제목과 함께 다음 페이지에서 시작 → 페이지 하단에서 잘려 시작하는 것 방지 */
@@ -483,7 +485,7 @@ function setIco(){ico.textContent=document.body.classList.contains("editor-colla
 fb.addEventListener("mousedown",function(e){e.stopPropagation();});
 fb.addEventListener("click",function(e){e.stopPropagation();var c=document.body.classList.toggle("editor-collapsed");if(!c)editor.style.flex="0 0 "+lastBasis;setIco();});
 sp.addEventListener("mousedown",function(e){if(e.target===fb||fb.contains(e.target))return;dragging=true;document.body.style.userSelect="none";document.body.style.cursor="col-resize";if(document.body.classList.contains("editor-collapsed")){document.body.classList.remove("editor-collapsed");setIco();}e.preventDefault();});
-window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.getBoundingClientRect();var w=e.clientX-r.left;w=Math.max(180,Math.min(r.width-260,w));editor.style.flex="0 0 "+w+"px";lastBasis=w+"px";});
+window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.getBoundingClientRect();var er=editor.getBoundingClientRect();var w=e.clientX-er.left;/* 편집기 실제 왼쪽 기준(탐색기+리사이저 폭 오프셋 반영) */var maxW=r.right-er.left-266;if(maxW<180)maxW=180;w=Math.max(180,Math.min(maxW,w));editor.style.flex="0 0 "+w+"px";lastBasis=w+"px";});
 window.addEventListener("mouseup",function(){if(dragging){dragging=false;document.body.style.userSelect="";document.body.style.cursor="";}});
 setIco();})();
 /* MD 원본 ↔ 미리보기 비율 스크롤 동기화. 한쪽의 스크롤 비율을 반대쪽에 반영.
@@ -706,6 +708,34 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
     }
   }catch(e){log("[open] "+e);}}
   window.__nativeOpen=nativeOpen;
+  window.__openMdPath=openMd;   /* 탐색기(explorer.js)에서 경로로 문서 열기 재사용 */
+  /* 탐색기에서 이미지 클릭 = 현재 커서 위치에 ![](경로) 삽입. 문서 폴더(__mdDir) 기준 상대경로(없으면 절대),
+     __mdDir 미확보(창-안 드롭 문서 등) 시엔 렌더 위해 풀에 바이트 적재 후 파일명 참조로 폴백. */
+  window.__insertImageFromPath=async function(abs){
+    if(!document.body.classList.contains("loaded"))return;
+    var ta=document.getElementById("rawInput");if(!ta)return;
+    var base=baseOf(abs),ref=null;
+    if(window.__mdDir){
+      try{ref=await Neutralino.filesystem.getRelativePath(abs,window.__mdDir);}catch(e){ref=null;}
+      if(ref)ref=ref.replace(/\\/g,"/");
+      if(!ref)ref=abs.replace(/\\/g,"/");   /* 상대경로 산출 실패(다른 드라이브 등) → 절대경로 폴백 */
+    }else{
+      try{var du=await readAsDataUrl(abs);window.__drop=window.__drop||{};window.__drop[base]=await window.__img.encode(du,mimeOf(abs));}catch(e){log("[ins img] "+abs);}
+      ref=base;
+    }
+    var alt=base.replace(/\.[a-z0-9]+$/i,"");
+    var dest=/\s/.test(ref)?"<"+ref+">":ref;
+    var snippet="!["+alt+"]("+dest+")";
+    var pos=ta.value.length;try{if(ta.selectionStart!=null)pos=ta.selectionStart;}catch(e){}
+    pos=Math.min(Math.max(0,pos|0),ta.value.length);
+    var before=ta.value.slice(0,pos),after=ta.value.slice(pos);
+    var block=(before&&!/\n$/.test(before)?"\n":"")+snippet+(after&&!/^\n/.test(after)?"\n":"");
+    var nt=before+block+after;ta.value=nt;
+    var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function")mirror.innerHTML=hlMd(nt);
+    try{ta.selectionStart=ta.selectionEnd=(before+block).length;ta.focus();}catch(e){}
+    if(mirror){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
+    if(typeof renderPreview==="function")renderPreview(nt,true);
+  };
   /* 실행 인자로 넘어온 .md 자동 열기(더블클릭/연결앱/아이콘에 드롭 시 경로와 함께 실행됨) */
   try{var hasRecover=false;try{hasRecover=!!localStorage.getItem("mdeautify_recover");}catch(_){}  /* 연결끊김 복구 대기 중이면 인자 파일 열기 스킵(복구본이 우선) */
     if(!hasRecover){var a=window.NL_ARGS||[];for(var i=1;i<a.length;i++){if(isMdPath(a[i])&&isAbs(a[i])){openMd(a[i]);break;}}}}catch(e){}
