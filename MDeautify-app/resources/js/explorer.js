@@ -63,11 +63,62 @@
   function norm(p){return String(p||"").replace(/[\\/]+/g,"\\").replace(/\\+$/,"");}
 
   function flash(msg){
+    if(window.__toast){window.__toast(msg);return;}   /* 공용 토스트(뷰어 우상단 앵커) 위임 */
     var t=document.getElementById("fbToast");
-    if(!t){t=document.createElement("div");t.id="fbToast";document.body.appendChild(t);}  /* body 고정 → 빈 상태·설정 모달 위에서도 보임 */
+    if(!t){t=document.createElement("div");t.id="fbToast";document.body.appendChild(t);}  /* 폴백 */
     t.textContent=msg;t.classList.remove("show");void t.offsetWidth;t.classList.add("show");
     clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},1600);
   }
+
+  /* ===== 이미지 미리보기 팝오버 =====
+     탐색기 이미지 클릭 → 클릭 위치에 썸네일 미리보기 + '삽입' 버튼. 삽입 눌러야 열린 md 커서에 ![](경로) 삽입. */
+  var imgPop=null,imgPopReq=0;
+  function positionPop(pop,x,y){
+    var pw=pop.offsetWidth||280,ph=pop.offsetHeight||220,vw=window.innerWidth,vh=window.innerHeight,m=8;
+    var left=x+12;if(left+pw>vw-m)left=Math.max(m,x-pw-12);
+    var top=y+12;if(top+ph>vh-m)top=Math.max(m,vh-ph-m);
+    pop.style.left=left+"px";pop.style.top=top+"px";
+  }
+  function hideImgPop(){if(imgPop){imgPop.hidden=true;imgPopReq++;}}
+  function buildImgPop(){
+    if(imgPop)return imgPop;
+    imgPop=document.createElement("div");imgPop.id="imgPop";imgPop.hidden=true;
+    imgPop.innerHTML="<div class='ip-thumb'><img alt=''></div><div class='ip-name'></div><div class='ip-btns'><button type='button' class='ip-cancel'>취소</button><button type='button' class='ip-insert'>삽입</button></div>";
+    document.body.appendChild(imgPop);
+    return imgPop;
+  }
+  async function showImgPopover(node,ev){
+    var pop=buildImgPop();
+    var req=++imgPopReq;
+    var img=pop.querySelector(".ip-thumb img"),nameEl=pop.querySelector(".ip-name");
+    var insBtn=pop.querySelector(".ip-insert"),cancelBtn=pop.querySelector(".ip-cancel");
+    nameEl.textContent=node.name;
+    try{img.removeAttribute("src");}catch(e){}
+    pop.classList.remove("err");pop.classList.add("loading");
+    pop.hidden=false;
+    positionPop(pop,ev.clientX,ev.clientY);
+    insBtn.onclick=function(){
+      if(!document.body.classList.contains("loaded")){
+        hideImgPop();   /* 팝오버 닫고 중앙 모달로 안내(가시성) */
+        if(window.__appAlert)window.__appAlert("이미지를 삽입하려면 먼저 문서를 열어주세요.","열린 문서가 없어요");
+        else flash("먼저 문서를 열어주세요");
+        return;
+      }
+      if(window.__insertImageFromPath)window.__insertImageFromPath(node.path);
+      hideImgPop();flash("이미지를 삽입했어요");
+    };
+    cancelBtn.onclick=hideImgPop;
+    img.onload=function(){if(req===imgPopReq)positionPop(pop,ev.clientX,ev.clientY);};   /* 이미지 크기 확정 후 재배치 */
+    try{
+      var du=window.__imgDataUrl?await window.__imgDataUrl(node.path):null;
+      if(req!==imgPopReq)return;   /* 그새 닫혔거나 다른 이미지로 교체됨 */
+      pop.classList.remove("loading");
+      if(du){img.src=du;}else{pop.classList.add("err");}
+    }catch(e){if(req===imgPopReq){pop.classList.remove("loading");pop.classList.add("err");}}
+  }
+  document.addEventListener("mousedown",function(e){if(imgPop&&!imgPop.hidden&&!imgPop.contains(e.target))hideImgPop();});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&imgPop&&!imgPop.hidden){e.preventDefault();hideImgPop();}});
+  window.addEventListener("resize",function(){if(imgPop&&!imgPop.hidden)hideImgPop();});
 
   async function loadDir(path){
     if(loading[path])return;
@@ -111,8 +162,7 @@
         });
       }
       else if(node.img){
-        if(!document.body.classList.contains("loaded")){flash("먼저 문서를 열어주세요");return;}
-        if(window.__insertImageFromPath)window.__insertImageFromPath(node.path);
+        showImgPopover(node,ev);   /* 즉시 삽입 대신 클릭 위치에 미리보기 팝오버 → '삽입' 눌러야 삽입 */
       }
     });
     return d;

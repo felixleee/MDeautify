@@ -13,17 +13,18 @@
     var d=null; try{d=JSON.parse(raw);}catch(e){}
     if(!d||typeof d.text!=="string")return;
     (function apply(){
-      if(typeof window.renderMarkdown!=="function"){setTimeout(apply,60);return;}   /* app.js 준비 대기 */
+      if(typeof window.__openDoc!=="function"&&typeof window.renderMarkdown!=="function"){setTimeout(apply,60);return;}   /* app.js·tabs.js 준비 대기 */
       try{
-        if(d.drop&&typeof d.drop==="object")window.__drop=d.drop;
-        if(d.path){window.__mdPath=d.path;window.__mdDir=d.dir||null;window.__mdName=d.name||null;window.__fname=d.fname||null;}
-        window.renderMarkdown(d.text);
-        if(typeof window.__renderFileBadge==="function")window.__renderFileBadge();
+        if(window.__openDoc){   /* 복원 문서도 탭으로 */
+          window.__openDoc({path:d.path||null,dir:d.dir||null,name:d.name||null,fname:d.fname||null,text:d.text,drop:(d.drop&&typeof d.drop==="object")?d.drop:{}});
+        }else{
+          if(d.drop&&typeof d.drop==="object")window.__drop=d.drop;
+          if(d.path){window.__mdPath=d.path;window.__mdDir=d.dir||null;window.__mdName=d.name||null;window.__fname=d.fname||null;}
+          window.renderMarkdown(d.text);
+          if(typeof window.__renderFileBadge==="function")window.__renderFileBadge();
+        }
       }catch(e){}
-      var editor=document.getElementById("editor");
-      if(editor){var t=document.getElementById("fbToast");if(!t){t=document.createElement("div");t.id="fbToast";editor.appendChild(t);}
-        t.textContent="재연결 후 편집 내용을 복원했어요";t.classList.remove("show");void t.offsetWidth;t.classList.add("show");
-        clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},2800);}
+      if(window.__toast)window.__toast("재연결 후 편집 내용을 복원했어요",2800);   /* 공용 토스트(뷰어 우상단 앵커) */
     })();
   })();
 

@@ -279,7 +279,9 @@ var head=document.getElementById("pvHead");
 try{var r=document.createElement("div");r.style.cssText="position:absolute;left:-9999px;width:100mm;height:10mm;";document.body.appendChild(r);var pxmm=r.offsetWidth/100;document.body.removeChild(r);var pc=(297-36)*pxmm;var n=(pc>0&&paper.scrollHeight>0)?Math.max(1,Math.ceil(paper.scrollHeight/pc)):0;if(head)head.textContent=n?("미리보기 · 약 "+n+"페이지 (저장/인쇄 시 자동 페이지 분할)"):"미리보기 (저장/인쇄 시 자동 페이지 분할)";}catch(e){if(head)head.textContent="미리보기";}
 document.getElementById("viewer").scrollTop=0;
 }
-function runPaged(src,keepScroll){
+function runPaged(src,keepScroll,attempt){
+  attempt=attempt||0;
+  var myGen=(window.__pgGen=(window.__pgGen||0)+1);   /* 이 조판의 세대 번호. 더 새 조판이 시작되면 이 결과는 폐기(탭 전환·연속 편집 경쟁 방지) */
   var pages=document.getElementById("pages");
   var viewer=document.getElementById("viewer");
   var pvHead=document.querySelector(".pv-head");var headH=pvHead?pvHead.offsetHeight:0;  /* 스티키 헤더에 가린 높이 */
@@ -314,13 +316,19 @@ function runPaged(src,keepScroll){
   document.body.appendChild(staging);
   function dropStaging(){if(staging&&staging.parentNode)staging.parentNode.removeChild(staging);staging=null;}
   function swapIn(){pages.innerHTML="";while(staging.firstChild)pages.appendChild(staging.firstChild);dropStaging();}
-  function fail(err){if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();}
+  function fail(err){if(myGen!==window.__pgGen){dropStaging();return;}if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();}
   /* 콘텐츠 맨 앞에 <style> 태그를 붙이면 Paged.js 가 첫 페이지를 복제하는 버그가 있다(표지 없는 문서에서 발현).
      → PAGED_CSS 는 스타일시트(blobUrl)로만 넘기고, blob 생성 실패 시에만 인라인 <style> 폴백. */
   var content=blobUrl?src.innerHTML:("<style>"+PAGED_CSS+"</style>"+src.innerHTML);
   try{
     var prev=new window.PagedModule.Previewer();
     prev.preview(content, blobUrl?[blobUrl]:[], staging).then(function(flow){
+      if(myGen!==window.__pgGen){dropStaging();return;}   /* 더 새 조판이 시작됨 → 이 결과 폐기 */
+      /* 조판 검증: 한 페이지 내용이 한 단을 넘어 다단으로 흘러넘쳤으면(=분할 미완결/경쟁으로 깨짐) 재조판.
+         정상 페이지는 scrollWidth==clientWidth(단일 단). 간헐적 '간격 과하게 넓음/뷰어 깨짐'의 실제 원인. */
+      var bad=false,pcs=staging.querySelectorAll(".pagedjs_page_content");
+      for(var bi=0;bi<pcs.length;bi++){if(pcs[bi].scrollWidth>pcs[bi].clientWidth+4){bad=true;break;}}
+      if(bad&&attempt<2){dropStaging();setTimeout(function(){if(myGen===window.__pgGen)runPaged(src,keepScroll,attempt+1);},50);return;}   /* 한 박자 쉬고 재조판(레이아웃 안정 후) */
       swapIn();
       repeatTableHeaders(pages);
       if(typeof applyFooter==="function")applyFooter();
@@ -349,8 +357,38 @@ if(window.__markClean)window.__markClean();   /* 새 문서 로드 = 저장 기�
 var mirror=document.getElementById("raw");if(mirror){mirror.innerHTML=hlMd(text);mirror.scrollTop=0;}
 renderPreview(text,false);
 }
-function loadFile(file){window.__lastFile=file;window.__mdDir=null;window.__mdPath=null;window.__mdName=file.name||"document";window.__fname=(file.name||"document").replace(/\.(md|markdown|txt)$/i,"");
-var r=new FileReader();r.onload=function(e){renderMarkdown(e.target.result);};r.readAsText(file,"utf-8");}
+/* 공용 토스트: md 뷰어(#viewer) 우상단(스티키 헤더 아래)에 표시. position:fixed 라 부모 무관 → 위치를 뷰어 기준으로 계산.
+   여러 곳(저장·이미지·복구·탐색기)이 같은 #fbToast 를 공유하되 항상 뷰어에 앵커되게 통일. */
+window.__toast=function(msg,dur){
+  var t=document.getElementById("fbToast");
+  if(!t){t=document.createElement("div");t.id="fbToast";document.body.appendChild(t);}
+  else if(t.parentNode!==document.body){document.body.appendChild(t);}   /* 예전에 #editor 등에 붙었던 잔재 → body 로 이동 */
+  t.textContent=msg;
+  /* 에디터 우상단 📎 배지 자리를 기준으로 앵커. 배지는 #editorBody 기준 top:8·right:14 절대배치이며
+     이미지 없을 땐 숨음 → 보이면 그 왼쪽, 숨으면 배지 자리(코너)에 오게 함. */
+  var eb=document.getElementById("editorBody"),badge=document.getElementById("fileBadge");
+  var th=t.offsetHeight||26,anchored=false;
+  if(eb){
+    var er=eb.getBoundingClientRect();
+    t.style.left="auto";
+    t.style.top=Math.round(er.top+8+11-th/2)+"px";   /* 배지 세로 중앙(top:8 + 높이≈22의 절반)에 맞춤 */
+    if(badge&&badge.getClientRects().length){var br=badge.getBoundingClientRect();t.style.right=Math.round(window.innerWidth-br.left+8)+"px";}  /* 배지 왼쪽 8px */
+    else{t.style.right=Math.round(window.innerWidth-er.right+14)+"px";}   /* 배지 숨김 → 배지 자리(right:14) */
+    anchored=true;
+  }
+  if(!anchored){   /* 폴백: 뷰어 우상단 */
+    var v=document.getElementById("viewer");
+    if(v){var r=v.getBoundingClientRect(),head=v.querySelector(".pv-head"),hh=head?head.offsetHeight:0;
+      t.style.top=Math.round(r.top+hh+12)+"px";t.style.right=Math.round(window.innerWidth-r.right+14)+"px";t.style.left="auto";}
+  }
+  t.classList.remove("show");void t.offsetWidth;t.classList.add("show");
+  clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},dur||1600);
+};
+function loadFile(file){window.__lastFile=file;var nm=file.name||"document",fn=nm.replace(/\.(md|markdown|txt)$/i,"");
+var r=new FileReader();r.onload=function(e){
+  if(window.__openDoc){window.__openDoc({path:null,dir:null,name:nm,fname:fn,text:e.target.result});}   /* 탭 매니저 */
+  else{window.__mdDir=null;window.__mdPath=null;window.__mdName=nm;window.__fname=fn;renderMarkdown(e.target.result);}   /* 폴백 */
+};r.readAsText(file,"utf-8");}
 /* 다른 MD로 교체하기 전 가드. true=교체 진행 / false=취소.
    - 문서 없음 또는 저장하지 않은 변경 없음 → 조용히 진행(묻지 않음).
    - 자동저장 ON + 경로 있음 → 저장만 하고 조용히 진행.
@@ -559,7 +597,7 @@ setIco();})();
 /* 편집 중엔 왼쪽 미러(색상 강조)만 즉시 갱신하고, 무거운 미리보기 재생성은 입력을 멈춘 뒤 3초 후 1회만 실행
    → 타이핑 중 오른쪽 미리보기가 자주 재분할되며 깜빡이던 문제 방지. */
 var EDIT_DELAY=2000;
-ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);if(window.__autoSave&&window.__autoSaveMd)window.__autoSaveMd();},EDIT_DELAY);});
+ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;if(window.__tabsOnEdit)window.__tabsOnEdit();clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);if(window.__autoSave&&window.__autoSaveMd)window.__autoSaveMd();},EDIT_DELAY);});
 function syncMirror(){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
 ta.addEventListener("scroll",syncMirror);
 /* 커서 이동(방향키·클릭·타이핑)으로 textarea 가 자동 스크롤될 때 'scroll' 이벤트가 누락되는 엔진이 있어
@@ -578,8 +616,10 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
   /* 변경감지: 현재 편집 내용이 마지막 저장/로드 기준선과 다르면 dirty. 문서 교체 가드가 사용. */
   window.__markClean=function(){savedText=ta.value;};
   window.__isDirty=function(){return document.body.classList.contains("loaded")&&ta.value!==savedText;};
+  window.__getSaved=function(){return savedText;};                 /* 탭 스냅샷: 현재 저장 기준선 읽기 */
+  window.__setSaved=function(t){savedText=(t==null?null:t);};      /* 탭 복원: 기준선 되돌려 dirty 상태 보존 */
   /* 짧은 토스트(이미지 추가 알림 #fbToast 요소·CSS 재사용) */
-  function toast(msg){var editor=document.getElementById("editor");if(!editor)return;var t=document.getElementById("fbToast");if(!t){t=document.createElement("div");t.id="fbToast";editor.appendChild(t);}t.textContent=msg;t.classList.remove("show");void t.offsetWidth;t.classList.add("show");clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},1600);}
+  function toast(msg){if(window.__toast)window.__toast(msg);}   /* 공용 토스트(뷰어 우상단 앵커) 위임 */
   window.__saveMd=async function(){
     if(!document.body.classList.contains("loaded"))return;   /* 문서 없으면 무시 */
     var text=ta.value;
@@ -603,7 +643,7 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
         toast("저장됨");
       }catch(e){try{Neutralino.debug.log("[save] "+e);}catch(_){}if(window.__appAlert)window.__appAlert("저장 중 문제가 발생했습니다.","오류");else alert("저장 중 문제가 발생했습니다.");}
     }else{   /* 브라우저: 다운로드 */
-      try{var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=defName;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);toast("다운로드됨");}catch(e){}
+      try{var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=defName;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);if(window.__appAlert)window.__appAlert("'"+defName+"' 파일을 다운로드했습니다.","다운로드 완료");else toast("다운로드됨");}catch(e){}
     }
   };
   /* 자동 저장: 편집 멈춘 뒤 미리보기 갱신 시점에 호출. EXE + 경로 있을 때만, 변경 있을 때만 조용히 저장. */
@@ -707,8 +747,11 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
     var abs=isAbs(s)?s.replace(/\//g,"\\"):joinP(window.__mdDir,s);
     try{var du=await readAsDataUrl(abs);return await window.__img.encode(du,mimeOf(abs));}catch(err){log("[img] resolve fail: "+abs);return null;}
   };
-  async function openMd(path){if(window.__confirmReplaceDoc&&!(await window.__confirmReplaceDoc()))return false;   /* 다른 MD 교체 전 확인(취소=false) */
-    try{var text=await Neutralino.filesystem.readFile(path);window.__mdPath=path;window.__mdDir=dirOf(path);  /* __drop(불러온 이미지 목록)은 문서 전환에도 유지 */window.__mdName=baseOf(path);window.__fname=baseOf(path).replace(/\.(md|markdown|txt)$/i,"");renderMarkdown(text);return true;}catch(err){log("[md] open fail: "+path);return false;}}
+  async function openMd(path){
+    try{var text=await Neutralino.filesystem.readFile(path);
+      if(window.__openDoc){window.__openDoc({path:path,dir:dirOf(path),name:baseOf(path),fname:baseOf(path).replace(/\.(md|markdown|txt)$/i,""),text:text});return true;}   /* 탭 매니저: 열기/포커스 */
+      window.__mdPath=path;window.__mdDir=dirOf(path);window.__mdName=baseOf(path);window.__fname=baseOf(path).replace(/\.(md|markdown|txt)$/i,"");renderMarkdown(text);return true;   /* 폴백(탭 미로드) */
+    }catch(err){log("[md] open fail: "+path);return false;}}
   function isImgPath(p){return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(p);}
   /* "파일 열기" 버튼 → 네이티브 파일창(.md·이미지). MD=문서 열기(기존 그대로) / 이미지=드래그&드랍처럼 풀에 추가 */
   async function nativeOpen(){try{
@@ -759,6 +802,8 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
     if(mirror){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
     if(typeof renderPreview==="function")renderPreview(nt,true);
   };
+  /* 탐색기 이미지 미리보기용: 경로의 원본 바이트를 data URL 로(썸네일 표시용, 인코딩 없이 원본). */
+  window.__imgDataUrl=async function(abs){try{return await readAsDataUrl(abs);}catch(e){log("[imgpreview] "+abs);return null;}};
   /* 실행 인자로 넘어온 .md 자동 열기(더블클릭/연결앱/아이콘에 드롭 시 경로와 함께 실행됨) */
   try{var hasRecover=false;try{hasRecover=!!localStorage.getItem("mdeautify_recover");}catch(_){}  /* 연결끊김 복구 대기 중이면 인자 파일 열기 스킵(복구본이 우선) */
     if(!hasRecover){var a=window.NL_ARGS||[];for(var i=1;i<a.length;i++){if(isMdPath(a[i])&&isAbs(a[i])){openMd(a[i]);break;}}}}catch(e){}
@@ -804,14 +849,13 @@ window.__resolveLocalImages=async function(src){
     var md=null,imgs=[];
     for(var j=0;j<files.length;j++){var f=files[j];if(!md&&isMdName(f.name))md=f;else if(isImgName(f.name))imgs.push(f);}
     if(md){
-      if(window.__confirmReplaceDoc&&!(await window.__confirmReplaceDoc()))return;   /* 다른 MD 교체 전 확인 */
-      /* 함께 온 이미지는 기존 풀에 '병합'(문서 전환에도 이전 이미지 목록 유지) */
-      window.__drop=window.__drop||{};
-      for(var k=0;k<imgs.length;k++){var im=imgs[k];try{var du=await readDataUrl(im);window.__drop[im.name]=await window.__img.encode(du,im.type||mimeByName(im.name));}catch(e){}}
-      window.__mdDir=null;window.__mdPath=null;   /* 드롭 = 경로 미확보(WebView2 한계). 이전에 연 파일 경로가 남아 엉뚱한 파일을 덮어쓰지 않도록 초기화 */
+      /* 드롭 = 새 탭. 함께 온 이미지는 이 문서 전용 풀로(경로 미확보=WebView2 한계, path:null) */
+      var pool={};
+      for(var k=0;k<imgs.length;k++){var im=imgs[k];try{var du=await readDataUrl(im);pool[im.name]=await window.__img.encode(du,im.type||mimeByName(im.name));}catch(e){}}
       var text=await readText(md);
-      window.__mdName=md.name;window.__fname=md.name.replace(/\.(md|markdown|txt)$/i,"");
-      renderMarkdown(text);
+      var dname=md.name,dfname=md.name.replace(/\.(md|markdown|txt)$/i,"");
+      if(window.__openDoc){window.__openDoc({path:null,dir:null,name:dname,fname:dfname,text:text,drop:pool});}
+      else{window.__drop=pool;window.__mdDir=null;window.__mdPath=null;window.__mdName=dname;window.__fname=dfname;renderMarkdown(text);}
     }else if(imgs.length&&document.body.classList.contains("loaded")){
       /* 이미지만 드롭 → 파일 풀(window.__drop)에 추가.
          에디터(textarea) 위에 드롭했으면(insAt!=null) 그 위치에 ![](이름) 참조까지 삽입,
@@ -960,12 +1004,7 @@ window.__resolveLocalImages=async function(src){
     if(!badge)return;
     badge.classList.remove("flash-added");void badge.offsetWidth;badge.classList.add("flash-added");
     setTimeout(function(){badge.classList.remove("flash-added");},3600);
-    var editor=document.getElementById("editor");if(!editor)return;
-    var t=document.getElementById("fbToast");
-    if(!t){t=document.createElement("div");t.id="fbToast";editor.appendChild(t);}
-    t.textContent=(n>1?("이미지 "+n+"개가 추가되었습니다"):"이미지가 추가되었습니다");
-    t.classList.remove("show");void t.offsetWidth;t.classList.add("show");
-    clearTimeout(t.__tmr);t.__tmr=setTimeout(function(){t.classList.remove("show");},1900);
+    if(window.__toast)window.__toast(n>1?("이미지 "+n+"개가 추가되었습니다"):"이미지가 추가되었습니다",1900);
   };
   /* 팝오버 클릭: X = 닫기 / '삽입' = 참조 삽입(닫지 않음 → 여러 번 연속 삽입 가능) */
   if(pop)pop.addEventListener("click",function(e){
