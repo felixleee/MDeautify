@@ -308,10 +308,10 @@ body.loaded #fileBadge{display:inline-flex;}
 #imgPop .ip-insert{border:1px solid var(--ui-brand-accent);background:var(--ui-brand-accent);color:#fff;}
 #imgPop .ip-insert:hover{background:color-mix(in srgb,var(--ui-brand-accent) 88%,#000);}
 /* ===== AI 작성 도우미 패널 ===== */
-#aiResizer{flex:0 0 5px;cursor:col-resize;background:var(--ui-editor-border);position:relative;z-index:5;}
+#aiResizer{flex:0 0 5px;cursor:col-resize;background:var(--ui-editor-border);position:relative;z-index:5;order:1;}   /* order:1 → 항상 맨 오른쪽(문서 없을 때 #drop 이 aiPanel 뒤라 끼어들던 문제 방지) */
 #aiResizer[hidden]{display:none;}
 #aiResizer:hover,#aiResizer.drag{background:var(--ui-brand-accent);}
-#aiPanel{position:relative;z-index:5;flex:0 0 340px;min-width:240px;max-width:640px;display:flex;flex-direction:column;min-height:0;background:var(--ui-editor-bg);border-left:1px solid var(--ui-editor-border);overflow:hidden;}
+#aiPanel{position:relative;z-index:5;order:1;flex:0 0 340px;min-width:240px;max-width:640px;display:flex;flex-direction:column;min-height:0;background:var(--ui-editor-bg);border-left:1px solid var(--ui-editor-border);overflow:hidden;}
 #aiPanel[hidden]{display:none;}
 .ai-head{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:7px 8px 7px 12px;border-bottom:1px solid var(--ui-editor-border);}
 .ai-title{font-size:12px;font-weight:700;color:var(--tm-fg);}
