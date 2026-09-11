@@ -1,6 +1,6 @@
 
 function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
-function hlMd(t){var e=esc(t);
+function hlMd(t){t=String(t==null?"":t).replace(/\r\n?/g,"\n");var e=esc(t);   /* CRLF/CR → LF: 색상 미러는 textarea(값이 LF로 정규화됨)와 줄바꿈이 정확히 같아야 함(CRLF 파일에서 미러만 2배로 늘어 커서·선택 어긋남 방지) */
 /* 각 줄을 .ln[data-ln] 로 감싸 스크롤 동기화(방식 B)에서 줄별 Y좌표를 측정 가능하게 함.
    인라인 span이라 오버레이(투명 textarea) 정합에는 영향 없음. */
 return e.split("\n").map(function(line,i){var l=line;
@@ -352,6 +352,7 @@ runPaged(src,keepScroll);
 }
 /* 파일 로드 등: 에디터(textarea+미러)에 내용을 채우고 미리보기도 처음부터 생성 */
 function renderMarkdown(text){
+if(text!=null)text=String(text).replace(/\r\n?/g,"\n");   /* 편집기 진입 텍스트는 LF 로 통일(CRLF 파일에서 textarea/미러 줄바꿈 불일치 방지) */
 var ta=document.getElementById("rawInput");if(ta){ta.value=text;ta.scrollTop=0;}
 if(window.__markClean)window.__markClean();   /* 새 문서 로드 = 저장 기준선 리셋(변경감지 초기화) */
 var mirror=document.getElementById("raw");if(mirror){mirror.innerHTML=hlMd(text);mirror.scrollTop=0;}
@@ -1059,7 +1060,7 @@ window.__resolveLocalImages=async function(src){
    - ETag 조건부 요청(If-None-Match): 변경 없으면 304 → GitHub rate limit 에 미차감(사실상 공짜). 미인증 60회/시간 소진 방지.
    - 실패 시 캐시가 있으면 캐시로 폴백. force=true 면 TTL 무시하고 재검증(단 ETag 로 304 면 여전히 무료). */
 (function(){
-  var REPO="felixleee/MDeautify",URL="https://api.github.com/repos/"+REPO+"/releases?per_page=10",TTL=600000;
+  var REPO="felixleee/MDeautify",URL="https://api.github.com/repos/"+REPO+"/releases?per_page=100",TTL=600000;
   var cache=null,etag=null,ts=0,inflight=null;
   window.__ghReleases=function(force){
     var now=Date.now();
@@ -1092,7 +1093,7 @@ window.__resolveLocalImages=async function(src){
   function stripHead(md){return String(md||"").replace(/^[ \t]*#{1,2}[ \t]+.*(?:\r?\n)+/,"");}
   /* 최근 5개 릴리스를 공유 캐시(window.__ghReleases)에서 가져와 각 버전 섹션으로 렌더 — 자동 업데이트 확인과 호출 공유. */
   function fetchRecent(){
-    return window.__ghReleases().then(function(arr){if(!Array.isArray(arr))arr=[];return arr.slice(0,5).map(function(j){
+    return window.__ghReleases().then(function(arr){if(!Array.isArray(arr))arr=[];return arr.map(function(j){
         var tag=String(j.tag_name||j.name||"").replace(/^v/i,"");
         return {ver:tag?("v"+tag):(j.name||"릴리스"),
                 date:String(j.published_at||j.created_at||"").slice(0,10),

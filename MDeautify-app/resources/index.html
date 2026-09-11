@@ -38,6 +38,7 @@
         <button id='btnExplorer' title='폴더 탐색기 (Ctrl+B)' aria-label='폴더 탐색기' hidden><svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><rect x='3' y='4' width='18' height='16' rx='2'/><line x1='9' y1='4' x2='9' y2='20'/></svg></button>
         <button id='btnOpenTop' title='MD 파일 열기 · 이미지 넣기'>파일 열기</button>
         <button id='btnTheme' title='PDF 설정'>PDF 설정</button>
+        <button id='btnAI' title='AI 작성 도우미 (Ctrl+Shift+A)'>AI</button>
         <span class='spacer'></span>
         <button id='btnSettings' title='설정' aria-label='설정'><svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><circle cx='12' cy='12' r='3'/><path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'/></svg></button>
         <button id='btnPrint' title='버튼 한 번으로 미리보기 그대로 PDF로 저장합니다. (Edge/Chrome 미설치 등 예외 시 인쇄 대화상자로 전환)'>PDF 저장</button>
@@ -217,6 +218,46 @@
           <div class='pv-head' id='pvHead'>Total 0 pages</div>
           <div id='pages'></div>
         </section>
+        <div id='aiResizer' title='AI 패널 너비 조절' aria-hidden='true' hidden></div>
+        <aside id='aiPanel' hidden aria-label='AI 작성 도우미'>
+          <div class='ai-head'>
+            <span class='ai-title'>AI 작성 도우미</span>
+            <span class='ai-spacer'></span>
+            <select id='aiModel' class='ai-model' title='모델'></select>
+            <button id='aiClear' class='ai-ico' type='button' title='대화 지우기' aria-label='대화 지우기'><svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M3 6h18'/><path d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><path d='M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6'/></svg></button>
+            <button id='aiClose' class='ai-ico' type='button' title='닫기' aria-label='닫기'>✕</button>
+          </div>
+          <div id='aiMockHint' class='ai-mockhint' hidden>개발(브라우저) 모드 — 모의 응답입니다. 실제 호출은 설치형(EXE)에서 Claude Code CLI로 동작합니다.</div>
+          <div id='aiSetup' class='ai-setup' hidden>
+            <div class='ai-setup-title' id='aiSetupTitle'>AI 도우미 준비하기</div>
+            <div class='ai-setup-txt' id='aiSetupTxt'>이 기능은 <b>Claude Code</b>를 사용합니다(별도 API 키 불필요). 아래 <b>자동 설치</b> 버튼을 누르면 <b>npm·Node 없이</b> 공식 프로그램을 바로 설치해요. 설치 후 Claude 계정으로 1회 로그인만 하면 됩니다.</div>
+            <div class='ai-setup-btns'>
+              <button id='aiInstall' type='button'>자동 설치</button>
+              <button id='aiLogin' type='button' hidden>로그인 창 열기</button>
+              <button id='aiStartChat' type='button' class='ghost' hidden>채팅 시작</button>
+              <button id='aiRecheck' type='button' class='ghost'>다시 확인</button>
+            </div>
+            <pre id='aiInstallLog' class='ai-setup-log' hidden></pre>
+            <details class='ai-setup-manual'>
+              <summary>직접 설치할래요</summary>
+              <div class='ai-setup-txt'>PowerShell에서 아래를 실행하거나(권장), Node가 있으면 <code>npm install -g @anthropic-ai/claude-code</code> 도 됩니다.</div>
+              <div class='ai-setup-cmd'><code>irm https://claude.ai/install.ps1 | iex</code></div>
+              <button id='aiSetupOpen' type='button' class='ghost'>공식 설치 안내 열기</button>
+            </details>
+          </div>
+          <div id='aiLog' class='ai-log'></div>
+          <div class='ai-input-wrap'>
+            <label class='ai-ctx'><input type='checkbox' id='aiCtx' checked> 현재 문서 포함</label>
+            <div class='ai-input-row'>
+              <textarea id='aiInput' rows='2' placeholder='요청을 입력하세요. 예: 이 문서를 표로 정리해줘 (Enter 전송 · Shift+Enter 줄바꿈)' spellcheck='false'></textarea>
+              <div class='ai-input-actions'>
+                <button id='aiSend' type='button' title='전송'>전송</button>
+                <button id='aiStop' type='button' title='중단' hidden>중단</button>
+              </div>
+            </div>
+            <div class='ai-cred' title='이 기능은 Anthropic의 Claude Code로 동작합니다'>Powered by <b>Claude</b> · Claude Code 기반</div>
+          </div>
+        </aside>
         <div id='drop'>
           <div class='drop-box'>
             <svg class='drop-ico' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>
@@ -249,5 +290,7 @@
       <script src="js/find.js"></script>
       <script src="js/recover.js"></script>
       <script src="js/explorer.js"></script>
+      <script src="js/ai/ai-providers/cli.js"></script>
+      <script src="js/ai/ai-chat.js"></script>
     </body>
 </html>
