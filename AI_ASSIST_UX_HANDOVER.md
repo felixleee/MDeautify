@@ -284,3 +284,65 @@ A2 코드를 붙일 때 `editor` 변수에는 **`#editorPane`** 을, `viewer`에
 - 메모리: `mdeautify-ai-assistant` · `mdeautify-crlf-editor-sync` · `mdeautify-release-autoupdate` ·
   `mdeautify-tool-overview` · `mdocify-tool-overview` · `mdocify-editing-ux-ported` ·
   `md2hwpx-tool-overview` · `mdhwpxify-release-status` · `window-state-ux-handover`
+
+---
+
+## 10. 실제 이식 기록 — MDocify (2026-09-14 완료)
+
+A2 + A3 + B 전부 이식하고 exe 빌드까지 확인. **실측 결과와 그때 걸린 것들**을 남긴다.
+
+### 결과
+
+| 검증 | 값 |
+|---|---|
+| 기본 분할 | 편집 637 / 미리보기 637 (반반) |
+| 탐색기 열림 | 528 / 527 (탐색기 214 제외) |
+| AI 패널 열림 | 465 / 464 (AI 340 제외) |
+| 스플리터 드래그 | 커서 위치와 **오차 0px** (기존 탐색기 오프셋 버그 해소) |
+| 비율 유지 | 0.46으로 끌어둔 뒤 패널 여닫아도 0.46 유지 |
+| AI 버튼 | 37px ↔ 95px, 라벨 잘림 없음 |
+
+### 걸린 것 5가지
+
+1. **파일이 CRLF다.** MDocify `app.js`·`explorer.js`는 CRLF라 `\n` 기준 멀티라인 앵커가 **전부 빗나간다**.
+   치환 스크립트는 파일의 EOL을 먼저 감지해 앵커·삽입문을 맞출 것.
+   (한 줄짜리 앵커만 우연히 통과해서 **부분 적용된 채 실패**할 수 있으니 순서 주의.)
+
+2. **CSS 변수는 다시 쓰지 말고 별칭으로 연결한다.** 이식한 AI CSS는 `--ui-brand-accent`,
+   `--ui-editor-bg/-border/-fg`, `--ui-drop-fg`를 쓰는데 MDocify엔 이 이름이 없다.
+   130줄을 고치는 대신 `body{}`에 **별칭 5줄**만 넣으면 끝이고, 대상 토큰이 `body.dark`에서
+   재정의되므로 **다크 모드도 자동으로 따라온다**. `--tm-*`·`--st-bad`·`--sb-*`는 이름이 이미 같다.
+   ```css
+   body{
+     --ui-brand-accent:var(--accent);   --ui-editor-bg:var(--ed-bg);
+     --ui-editor-border:var(--ed-border); --ui-editor-fg:var(--ed-fg);
+     --ui-drop-fg:var(--drop-fg);
+   }
+   ```
+   덕분에 AI 패널이 MDeautify 보라가 아니라 **MDocify 파랑으로 자동 적용**된다.
+
+3. **`avail()`에 오버레이 제외 가드가 필요하다.** MDocify는 `#drop`(드롭존)이 `#main`의
+   **직계 자식**이면서 `position:absolute;inset:0`이다. 문서가 없을 때 이게 폭을 가진 것으로 잡히면
+   계산이 틀어진다. 자식 순회에서 `position`이 `absolute`/`fixed`면 건너뛸 것.
+   (MDeautify도 같은 구조지만 `body.loaded` 가드에 가려 드러나지 않았다.)
+
+4. **부팅 스플래시가 브라우저 검증을 막는다.** 스플래시 해제는 Neutralino 네이티브 호출로 일어나서
+   브라우저에서는 `#bootSplash`가 계속 덮고 `#main` 폭이 0으로 나온다.
+   검증 전에 `document.getElementById('bootSplash').remove()` + `body.classList.add('loaded')`.
+
+5. **Browser pane은 숨겨져 있으면 레이아웃이 0으로 읽힌다.** 측정값이 전부 0이면 코드 문제가 아니라
+   렌더 스로틀일 수 있다. **스크린샷을 한 번 찍어 페인트를 깨운 뒤 다시 측정**하면 정상값이 나온다.
+
+### 치환 목록 (그대로 재사용 가능)
+
+| 대상 | 치환 |
+|---|---|
+| localStorage 13곳 | `md2pdf_` → `mdocify_` |
+| 편집기 textarea 2곳 | `$("rawInput")` → `$("editor")` |
+| 설정 이벤트 1곳 | `md2pdf:settings-hydrated` → `mdocify:settings-hydrated` |
+| 임시파일 접두어 1곳 | `mdeautify_ai_sys_` → `mdocify_ai_sys_` |
+| 시스템 프롬프트 | 산출물이 `.docx`(MDhwpxify는 `.hwpx`)라는 문장 1줄 추가 |
+| `loaded` 호출지점 | app.js 4곳 + tabs.js 2곳에 `__relayoutPanes()` |
+
+`window.__toast`·`__mdName`·`__mdPath`·`__img`는 자매앱에 **이미 전부 있다**(실측). 추가 작업 없음.
+`nativeAllowList`도 손댈 필요 없었다.
