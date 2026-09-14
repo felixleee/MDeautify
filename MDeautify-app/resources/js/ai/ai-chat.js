@@ -18,7 +18,7 @@
       var t=setInterval(function(){
         if(cancelled){clearInterval(t);return;}
         opts.onDelta(reply.slice(i,i+6));i+=6;
-        if(i>=reply.length){clearInterval(t);opts.onDone();}
+        if(i>=reply.length){clearInterval(t);var _n=Math.floor(Date.now()/1000);if(opts.onUsage)opts.onUsage({used:Math.round(60000+Math.random()*900000),contextWindow:1000000,model:"mock",rate:{unifiedWindows:{five_hour:{utilization:0.34,resetsAt:_n+2*3600+36*60},seven_day:{utilization:0.30,resetsAt:_n+3*86400+4*3600}}}});opts.onDone();}
       },25);
       if(opts.setCanceller)opts.setCanceller(function(){cancelled=true;clearInterval(t);opts.onDone();});
     }
@@ -26,7 +26,8 @@
 
   var provider=isExe&&window.__aiProviders&&window.__aiProviders.cli?window.__aiProviders.cli:MOCK;
 
-  var panel,logEl,inputEl,sendBtn,stopBtn,ctxEl,modelEl,mockHint,setupCard,inputWrap;
+  var panel,logEl,inputEl,sendBtn,stopBtn,ctxEl,modelEl,effortEl,mockHint,setupCard,inputWrap;
+  var EFFORTS=[{v:"",t:"기본"},{v:"low",t:"낮음"},{v:"medium",t:"보통"},{v:"high",t:"높음"},{v:"xhigh",t:"매우 높음"},{v:"max",t:"최대"}];
   var INSTALL_URL="https://code.claude.com/docs/en/setup";
   var msgs=[],busy=false,canceller=null;
 
@@ -61,8 +62,31 @@
 
   /* 문서 컨텍스트(토글 ON 이면 편집 중인 md 전체, 아니면 빈 문자열) */
   function currentContext(){
-    if(ctxEl&&ctxEl.checked){var ta=document.getElementById("rawInput");var md=ta?ta.value:"";if(md.trim())return md;}
+    if(ctxEl&&ctxEl.checked){
+      var ta=document.getElementById("rawInput");var md=ta?ta.value:"";
+      if(md.trim()){
+        var p=window.__mdPath||window.__mdName||"";   /* 전체경로 우선, 없으면 파일명, 그래도 없으면(미저장 드롭) 라벨 생략 */
+        return (p?("[파일 경로: "+p+"]\n\n"):"")+md;
+      }
+    }
     return "";
+  }
+
+  /* 이번 요청에 함께 보낼 문서 정보(포함 체크 + 내용 있을 때만) — 없으면 null */
+  function includedDocInfo(){
+    if(!(ctxEl&&ctxEl.checked))return null;
+    var ta=document.getElementById("rawInput");var md=ta?ta.value:"";
+    if(!md.trim())return null;
+    var path=window.__mdPath||"";
+    var name=window.__mdName||(path?path.replace(/^.*[\\\/]/,""):"")||"현재 문서";
+    return {name:name,path:path||name};
+  }
+  /* 유저 말풍선에 "이 문서가 함께 갔음" 칩 부착 */
+  function addDocChip(wrap,di){
+    var c=document.createElement("div");c.className="ai-doc-chip";c.title="함께 보낸 문서: "+di.path;
+    c.innerHTML="<svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M14 3v4a1 1 0 0 0 1 1h4'/><path d='M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z'/></svg><span></span>";
+    c.querySelector("span").textContent=di.name;
+    wrap.insertBefore(c,wrap.firstChild);
   }
 
   function send(){
@@ -72,6 +96,7 @@
     inputEl.value="";autoGrow();
     msgs.push({role:"user",content:text});
     var u=addBubble("user");u.body.textContent=text;
+    var di=includedDocInfo();if(di)addDocChip(u.wrap,di);
     var a=addBubble("assistant");a.wrap.classList.add("streaming");
     a.body.textContent="작성 중…";
     var acc="",started=false;
@@ -79,6 +104,7 @@
     provider.sendChat({
       messages:msgs.slice(),
       model:(modelEl&&modelEl.value)||provider.defaultModel,
+      effort:(effortEl&&effortEl.value)||"",
       system:currentContext(),
       onDelta:function(t){if(!started){started=true;a.body.textContent="";showStop(false);}acc+=t;a.body.textContent=acc;scrollBottom();},
       onDone:function(){
@@ -105,12 +131,70 @@
         }
         msgs.pop();setBusy(false);showStop(false);scrollBottom();
       },
+      onUsage:function(info){updateCtxBar(info);},
       setCanceller:function(fn){canceller=fn;}
     });
   }
 
+  /* ---- 컨텍스트 사용량 바(하단) ---- */
+  var CTX_LIMIT=200000;   /* 폴백: 실제 contextWindow 를 못 받았을 때만 사용 */
+  var lastCtxInfo=null,popOpen=false;
+  function ctxWinFor(info){   /* 실제 창값 우선 + 모델별 localStorage 캐시(응답에 값이 빠져도 이전 값 재사용) */
+    var m=info.model||"m",key="md2pdf_ctxwin_"+m,w=info.contextWindow||0;
+    if(w>0){try{localStorage.setItem(key,String(w));}catch(e){}return w;}
+    try{var c=parseInt(localStorage.getItem(key),10);if(c>0)return c;}catch(e){}
+    return CTX_LIMIT;
+  }
+  function updateCtxBar(info){
+    info=info||{};info.contextWindow=ctxWinFor(info);lastCtxInfo=info;   /* 창값 확정(캐시 반영) 후 저장 → 바·팝오버 일관 */
+    var bar=$("aiCtxBar");if(bar){
+      var used=info.used||0,limit=info.contextWindow||CTX_LIMIT;
+      if(used&&limit){
+        var pct=Math.min(100,Math.round(used/limit*100));
+        var fill=$("aiCtxFill"),pctEl=$("aiCtxPct"),lab=$("aiCtxLabel");
+        if(fill)fill.style.width=pct+"%";
+        if(pctEl)pctEl.textContent=pct+"%";
+        bar.classList.toggle("warn",pct>=78&&pct<94);
+        bar.classList.toggle("crit",pct>=94);
+        if(lab)lab.textContent=(pct>=94)?"컨텍스트 거의 참 — 대화 지우기 권장":"컨텍스트";
+        bar.hidden=false;
+      }else bar.hidden=true;
+    }
+    if(popOpen)renderUsagePop();
+  }
+  function resetCtxBar(){lastCtxInfo=null;toggleUsagePop(false);var bar=$("aiCtxBar");if(!bar)return;bar.hidden=true;bar.classList.remove("warn","crit");var f=$("aiCtxFill");if(f)f.style.width="0";var p=$("aiCtxPct");if(p)p.textContent="0%";var l=$("aiCtxLabel");if(l)l.textContent="컨텍스트";}
+
+  /* ---- 사용량 팝오버(컨텍스트 + 5시간/주간 한도, Claude 앱 스타일) ---- */
+  function fmtTok(n){n=Math.round(n||0);if(n>=1e6)return String(Math.round(n/1e5)/10).replace(/\.0$/,"")+"M";if(n>=1e3)return Math.round(n/1e3)+"k";return String(n);}
+  function fmtReset(sec){
+    if(!sec)return "";
+    var d=sec-Date.now()/1000;
+    if(d<=0)return "곧 재설정";
+    if(d<86400){var h=Math.floor(d/3600),m=Math.floor((d%3600)/60);return (h?h+"시간 ":"")+m+"분 후 재설정";}
+    var dt=new Date(sec*1000),wd=["일","월","화","수","목","금","토"][dt.getDay()],hh=dt.getHours(),ap=hh<12?"오전":"오후",h12=hh%12||12;
+    return (dt.getMonth()+1)+"/"+dt.getDate()+"("+wd+") "+ap+" "+h12+":"+("0"+dt.getMinutes()).slice(-2)+" 재설정";
+  }
+  function setUpBar(id,pct){var f=$(id);if(!f)return;f.style.width=Math.min(100,pct)+"%";f.classList.toggle("warn",pct>=80&&pct<95);f.classList.toggle("crit",pct>=95);}
+  function renderUsagePop(){
+    var info=lastCtxInfo||{};
+    var used=info.used||0,win=info.contextWindow||0,cp=(used&&win)?Math.min(100,Math.round(used/win*100)):0;
+    if($("upCtxVal"))$("upCtxVal").textContent=(used&&win)?(fmtTok(used)+" / "+fmtTok(win)+" ("+cp+"%)"):"–";
+    setUpBar("upCtxFill",cp);
+    var uw=(info.rate&&info.rate.unifiedWindows)||{},fh=uw.five_hour||{},sd=uw.seven_day||{};
+    var fp=Math.round((fh.utilization||0)*100),wp=Math.round((sd.utilization||0)*100);
+    if($("up5Val"))$("up5Val").textContent=(fh.utilization!=null)?fp+"%":"–";
+    setUpBar("up5Fill",fp);if($("up5Reset"))$("up5Reset").textContent=fmtReset(fh.resetsAt);
+    if($("upWVal"))$("upWVal").textContent=(sd.utilization!=null)?wp+"%":"–";
+    setUpBar("upWFill",wp);if($("upWReset"))$("upWReset").textContent=fmtReset(sd.resetsAt);
+  }
+  function toggleUsagePop(show){
+    var pop=$("aiUsagePop");if(!pop)return;
+    popOpen=(show==null)?pop.hidden:!!show;
+    if(popOpen){renderUsagePop();pop.hidden=false;}else pop.hidden=true;
+  }
+
   function stop(){if(canceller){try{canceller();}catch(e){}}setBusy(false);showStop(false);}
-  function clearChat(){msgs=[];if(logEl)logEl.innerHTML="";}
+  function clearChat(){msgs=[];if(logEl)logEl.innerHTML="";resetCtxBar();}
 
   function refreshState(){if(mockHint)mockHint.hidden=(provider!==MOCK);}
   /* CLI 설치 감지 → 없으면 설치 안내 카드, 채팅 영역 숨김 */
@@ -187,9 +271,8 @@
       "<div class='lg-scroll'>"+
       "<div class='lg-stage'><div class='lg-art'></div><div class='lg-step'></div><div class='lg-title'></div><div class='lg-desc'></div>"+
       "<button type='button' class='lg-reopen' hidden>로그인 창 다시 열기</button></div>"+
-      "<div class='lg-dots'></div>"+
       "</div>"+
-      "<div class='lg-nav'><button type='button' class='lg-prev'>이전</button><button type='button' class='lg-next'>다음</button></div></div>";
+      "<div class='lg-nav'><button type='button' class='lg-prev'>이전</button><div class='lg-dots'></div><button type='button' class='lg-next'>다음</button></div></div>";
     document.body.appendChild(lgOverlay);
     lgOverlay.querySelector(".lg-x").addEventListener("click",lgClose);
     lgOverlay.querySelector(".lg-prev").addEventListener("click",function(){lgGo(lgIdx-1);});
@@ -252,6 +335,13 @@
     if(saved&&provider.models.some(function(m){return m.id===saved;}))modelEl.value=saved;
     else modelEl.value=provider.defaultModel;
   }
+  function applyEffort(){
+    if(!effortEl)return;
+    effortEl.innerHTML="";
+    EFFORTS.forEach(function(e){var o=document.createElement("option");o.value=e.v;o.textContent=e.t;effortEl.appendChild(o);});
+    var saved=null;try{saved=localStorage.getItem("md2pdf_ai_effort");}catch(e){}
+    effortEl.value=EFFORTS.some(function(e){return e.v===saved;})?saved:"";
+  }
 
   function initResizer(){
     var rez=$("aiResizer"),main=$("main");if(!rez||!main)return;
@@ -265,7 +355,7 @@
   function init(){
     panel=$("aiPanel");if(!panel)return;
     logEl=$("aiLog");inputEl=$("aiInput");sendBtn=$("aiSend");stopBtn=$("aiStop");
-    ctxEl=$("aiCtx");modelEl=$("aiModel");mockHint=$("aiMockHint");
+    ctxEl=$("aiCtx");modelEl=$("aiModel");effortEl=$("aiEffort");mockHint=$("aiMockHint");
     setupCard=$("aiSetup");inputWrap=document.querySelector(".ai-input-wrap");
     setupTitle=$("aiSetupTitle");setupTxt=$("aiSetupTxt");installLog=$("aiInstallLog");
     installBtn=$("aiInstall");loginBtn=$("aiLogin");startBtn=$("aiStartChat");recheckBtn=$("aiRecheck");
@@ -279,12 +369,15 @@
     var clr=$("aiClear");if(clr)clr.addEventListener("click",clearChat);
     if(sendBtn)sendBtn.addEventListener("click",send);
     if(stopBtn)stopBtn.addEventListener("click",stop);
+    var cbar=$("aiCtxBar");if(cbar)cbar.addEventListener("click",function(e){e.stopPropagation();toggleUsagePop();});
+    document.addEventListener("click",function(e){if(!popOpen)return;var pop=$("aiUsagePop"),cb=$("aiCtxBar");if(pop&&!pop.contains(e.target)&&cb&&!cb.contains(e.target))toggleUsagePop(false);});
     if(inputEl)inputEl.addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});
     if(inputEl)inputEl.addEventListener("input",autoGrow);
     autoGrow();
     if(modelEl)modelEl.addEventListener("change",function(){try{localStorage.setItem("md2pdf_ai_model",modelEl.value);}catch(e){}});
+    if(effortEl)effortEl.addEventListener("change",function(){try{localStorage.setItem("md2pdf_ai_effort",effortEl.value);}catch(e){}});
     document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==="a"||e.key==="A")){e.preventDefault();toggleOpen();}});
-    applyModel();initResizer();applyWidth();applyOpenDefault();
+    applyModel();applyEffort();initResizer();applyWidth();applyOpenDefault();
   }
 
   document.addEventListener("md2pdf:settings-hydrated",function(){applyModel();applyWidth();applyOpenDefault();});

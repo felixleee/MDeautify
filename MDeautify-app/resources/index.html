@@ -247,13 +247,38 @@
           </div>
           <div id='aiLog' class='ai-log'></div>
           <div class='ai-input-wrap'>
-            <label class='ai-ctx'><input type='checkbox' id='aiCtx' checked> 현재 문서 포함</label>
+            <div id='aiUsagePop' class='ai-usagepop' hidden>
+              <div class='up-item'>
+                <div class='up-row'><span class='up-lab'>컨텍스트 윈도우</span><span class='up-val' id='upCtxVal'>–</span></div>
+                <div class='up-track'><div class='up-fill' id='upCtxFill'></div></div>
+              </div>
+              <div class='up-head'>사용 한도</div>
+              <div class='up-item'>
+                <div class='up-row'><span class='up-lab'>5시간 한도</span><span class='up-val' id='up5Val'>–</span></div>
+                <div class='up-track'><div class='up-fill' id='up5Fill'></div></div>
+                <div class='up-reset' id='up5Reset'></div>
+              </div>
+              <div class='up-item'>
+                <div class='up-row'><span class='up-lab'>주간 한도</span><span class='up-val' id='upWVal'>–</span></div>
+                <div class='up-track'><div class='up-fill' id='upWFill'></div></div>
+                <div class='up-reset' id='upWReset'></div>
+              </div>
+            </div>
+            <div class='ai-optrow'>
+              <label class='ai-ctx'><input type='checkbox' id='aiCtx' checked> 현재 문서 포함</label>
+              <label class='ai-effort-wrap' title='추론 강도(effort) — 높을수록 더 깊게 생각하지만 느려집니다'>Effort <select id='aiEffort' class='ai-effort'></select></label>
+            </div>
             <div class='ai-input-row'>
               <textarea id='aiInput' rows='2' placeholder='요청을 입력하세요. 예: 이 문서를 표로 정리해줘 (Enter 전송 · Shift+Enter 줄바꿈)' spellcheck='false'></textarea>
               <div class='ai-input-actions'>
                 <button id='aiSend' type='button' title='전송'>전송</button>
                 <button id='aiStop' type='button' title='중단' hidden>중단</button>
               </div>
+            </div>
+            <div id='aiCtxBar' class='ai-ctxbar' hidden title='이 대화가 사용 중인 컨텍스트 창(모델 실제 한도 기준)'>
+              <span id='aiCtxLabel' class='ai-ctxbar-label'>컨텍스트</span>
+              <div class='ai-ctxbar-track'><div id='aiCtxFill' class='ai-ctxbar-fill'></div></div>
+              <span id='aiCtxPct' class='ai-ctxbar-pct'>0%</span>
             </div>
             <div class='ai-cred' title='이 기능은 Anthropic의 Claude Code로 동작합니다'>Powered by <b>Claude</b> · Claude Code 기반</div>
           </div>
@@ -268,7 +293,7 @@
             <h2>MD 파일을 끌어다 놓거나 열어서 시작하세요</h2>
             <div class='sub'>이미지가 있으면 <b>.md 와 이미지 파일을 함께</b>(또는 폴더째) 끌어다 놓으세요. 또는 아래 <b>파일 열기</b> 버튼으로 선택.</div>
             <div class='drop-note'>왼쪽은 마크다운 원본, 오른쪽은 실제 페이지 단위 미리보기입니다.<br>「PDF 저장」 버튼을 누르면 <b>미리보기 그대로</b> 곧바로 PDF 파일로 저장됩니다.</div>
-            <button id='btnOpen'>파일 열기</button>
+            <div class='drop-btns'><button id='btnNew' type='button'>새 문서</button><button id='btnOpen'>파일 열기</button></div>
           </div>
         </div>
       </div>

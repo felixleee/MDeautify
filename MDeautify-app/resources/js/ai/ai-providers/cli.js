@@ -79,13 +79,26 @@
     install:async function(cb){
       cb=cb||{};var onLog=cb.onLog||function(){},onDone=cb.onDone||function(){},onError=cb.onError||function(){};
       if(!isExe){onError("자동 설치는 설치형(EXE)에서만 동작합니다.");return;}
-      var cmd='powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex"';
-      var proc=null,handler=null,done=false;
+      /* PowerShell 명령은 -EncodedCommand(UTF-16LE Base64)로 전달 — 중첩 따옴표·파이프(|)가
+         spawnProcess→cmd 파싱에서 깨지는 문제를 원천 차단(한글 출력 코드페이지 문제도 없음).
+         TLS1.2 강제(구형 Windows PowerShell 기본값 대비) + 예외 메시지를 stdout 으로 노출. */
+      var PS="$ProgressPreference='SilentlyContinue';"+
+        "try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12}catch{};"+
+        "try{irm https://claude.ai/install.ps1 | iex}catch{Write-Output ('[설치 오류] '+$_.Exception.Message);exit 9}";
+      function encPS(t){var o=[];for(var i=0;i<t.length;i++){var c=t.charCodeAt(i);o.push(String.fromCharCode(c&255),String.fromCharCode(c>>8));}return btoa(o.join(""));}
+      var cmd='powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand '+encPS(PS);
+      var proc=null,handler=null,done=false,tail="";
       function finish(err){if(done)return;done=true;resolved=false;claudeCmd=null;if(handler){try{Neutralino.events.off("spawnedProcess",handler);}catch(e){}}if(err)onError(err);else onDone();}
       handler=function(evt){
         var d=evt.detail;if(!d||!proc||d.id!==proc.id)return;
-        if(d.action==="stdOut"||d.action==="stdErr"){onLog(String(d.data||""));}
-        else if(d.action==="exit"){if(String(d.data)==="0")finish(null);else finish("설치가 오류로 종료됐습니다 (exit "+d.data+"). 인터넷 연결을 확인하거나 아래 수동 설치를 이용하세요.");}
+        if(d.action==="stdOut"||d.action==="stdErr"){var s=String(d.data||"");tail=(tail+s).slice(-800);onLog(s);}
+        else if(d.action==="exit"){
+          if(String(d.data)==="0")finish(null);
+          else{   /* 종료 코드만으로는 진단 불가 → 마지막 출력을 실패 메시지에 함께 노출 */
+            var t=tail.replace(/\s+/g," ").trim().slice(-300);
+            finish("설치가 오류로 종료됐습니다 (exit "+d.data+")."+(t?" 마지막 출력: "+t:" 출력 없음(PowerShell 실행 자체가 막혔을 수 있어요).")+" 사내망 프록시·방화벽에 막히는 경우가 많습니다 — 아래 수동 설치를 이용하세요.");
+          }
+        }
       };
       try{Neutralino.events.on("spawnedProcess",handler);}catch(e){}
       try{proc=await Neutralino.os.spawnProcess(cmd);}catch(e){finish("설치 실행에 실패했습니다 — PowerShell을 찾을 수 없습니다.");return;}
@@ -116,8 +129,9 @@
     },
     sendChat:async function(opts){
       var messages=opts.messages||[],model=opts.model||"sonnet",doc=opts.system||"";
+      var effort=(/^(low|medium|high|xhigh|max)$/.test(opts.effort||""))?opts.effort:"";   /* 허용값만(주입 방지); 빈값이면 CLI 기본 effort */
       var onDelta=opts.onDelta||function(){},onDone=opts.onDone||function(){},onError=opts.onError||function(){};
-      var onNeedLogin=opts.onNeedLogin||null;
+      var onNeedLogin=opts.onNeedLogin||null,onUsage=opts.onUsage||function(){};
       function loginErr(s){return /not logged in|please run \/login|\/login|invalid api key|authentication/i.test(String(s||""));}
       if(!isExe){onError("CLI 호출은 설치형(EXE)에서만 동작합니다.");return;}
       var base=await resolveCmd();
@@ -125,34 +139,65 @@
       var sysPath=null,cwd=null;
       try{sysPath=await writeTmp("mdeautify_ai_sys_"+Date.now()+".txt",SYS);cwd=await tmpDir();}catch(e){onError("임시 파일 생성 실패");return;}
       var prompt=buildPrompt(messages,doc);
-      var cmd=base+' -p --model '+model+' --system-prompt-file "'+sysPath+'" --disallowedTools Bash Edit Write NotebookEdit --output-format stream-json --include-partial-messages --verbose';
-      var buf="",raw="",acc="",resultText="",proc=null,handler=null,done=false;
+      var cmd=base+' -p --model '+model+(effort?' --effort '+effort:'')+' --system-prompt-file "'+sysPath+'" --disallowedTools Bash Edit Write NotebookEdit --output-format stream-json --include-partial-messages --verbose';
+      var buf="",raw="",acc="",resultText="",proc=null,handler=null,done=false,lastUsage=null,lastModelUsage=null,lastRate=null,initModel="";
       function finish(err,login){
         if(done)return;done=true;
         if(handler){try{Neutralino.events.off("spawnedProcess",handler);}catch(e){}}
         if(sysPath)rm(sysPath);
         if(login){if(onNeedLogin)onNeedLogin();else onError("Claude에 로그인이 필요합니다 — 'claude' 실행 후 로그인하세요.");return;}
         if(err)onError(err);
-        else{ if(!acc&&resultText)onDelta(resultText); onDone(); }
+        else{
+          if(!acc&&resultText)onDelta(resultText);
+          if(lastModelUsage){   /* modelUsage 에 실제 contextWindow + 정확한 토큰 세부가 있음(사용자/모델별) */
+            /* 한 턴에 보조 모델(haiku 등)도 섞여 오므로 첫 키를 쓰면 안 됨 → 실제 대화 모델 엔트리를 고른다 */
+            var mk=pickUsageKey(lastModelUsage,model,initModel),mu=(mk?lastModelUsage[mk]:{})||{};
+            var used=(mu.inputTokens||0)+(mu.cacheReadInputTokens||0)+(mu.cacheCreationInputTokens||0)+(mu.outputTokens||0);
+            onUsage({used:used,contextWindow:(mu.contextWindow||0),model:model,rate:lastRate});
+          }else if(lastUsage||lastRate){   /* 폴백: modelUsage 없을 때 top-level usage 사용(창 크기 모름) */
+            var u=lastUsage||{},uu=(u.input_tokens||0)+(u.cache_read_input_tokens||0)+(u.cache_creation_input_tokens||0)+(u.output_tokens||0);
+            onUsage({used:uu,contextWindow:0,model:model,rate:lastRate});
+          }
+          onDone();
+        }
+      }
+      /* modelUsage 키 선택: ①init의 정식 모델명 ②요청 별칭(opus/sonnet/haiku) 부분일치 ③창 크기가 가장 큰 것 */
+      function pickUsageKey(mu,alias,canon){
+        var keys=Object.keys(mu||{});if(!keys.length)return null;
+        if(canon&&mu[canon])return canon;
+        var a=String(alias||"").toLowerCase().replace(/^claude-/,"").split("-")[0];
+        if(a){for(var i=0;i<keys.length;i++){if(keys[i].toLowerCase().indexOf(a)>=0)return keys[i];}}
+        var best=keys[0];
+        for(var j=1;j<keys.length;j++){if(((mu[keys[j]]||{}).contextWindow||0)>((mu[best]||{}).contextWindow||0))best=keys[j];}
+        return best;
+      }
+      function handleLine(line){
+        if(!line||!line.trim())return;
+        var o;try{o=JSON.parse(line);}catch(e){raw+=line+"\n";return;}   /* JSON 아닌 줄(로그인 안내 등)은 진단용 보관 */
+        if(o.type==="system"&&o.subtype==="init"&&o.model){initModel=o.model;return;}   /* 이 턴의 정식 모델명 */
+        if(o.type==="rate_limit_event"&&o.rate_limit_info){lastRate=o.rate_limit_info;return;}
+        if(o.type==="stream_event"&&o.event&&o.event.type==="content_block_delta"&&o.event.delta&&o.event.delta.type==="text_delta"){acc+=o.event.delta.text;onDelta(o.event.delta.text);return;}
+        if(o.type==="assistant"&&o.message&&o.message.usage)lastUsage=o.message.usage;   /* 보조: 스트림 중간 assistant 메시지 usage */
+        if(o.type==="result"){if(typeof o.result==="string")resultText=o.result;if(o.usage)lastUsage=o.usage;if(o.modelUsage&&Object.keys(o.modelUsage).length)lastModelUsage=o.modelUsage;if(o.is_error||(o.subtype&&o.subtype!=="success")){if(loginErr(o.result)){finish(null,true);return;}finish(o.result||"CLI 오류");return;}}
       }
       handler=function(evt){
         var d=evt.detail;if(!d||!proc||d.id!==proc.id)return;
         if(d.action==="stdOut"){
           buf+=d.data;var idx;
-          while((idx=buf.indexOf("\n"))>=0){
-            var line=buf.slice(0,idx).replace(/\r$/,"");buf=buf.slice(idx+1);
-            if(!line.trim())continue;
-            var o;try{o=JSON.parse(line);}catch(e){raw+=line+"\n";continue;}   /* JSON 아닌 줄(로그인 안내 등)은 진단용 보관 */
-            if(o.type==="stream_event"&&o.event&&o.event.type==="content_block_delta"&&o.event.delta&&o.event.delta.type==="text_delta"){acc+=o.event.delta.text;onDelta(o.event.delta.text);}
-            else if(o.type==="result"){if(typeof o.result==="string")resultText=o.result;if(o.is_error||(o.subtype&&o.subtype!=="success")){if(loginErr(o.result))return finish(null,true);finish(o.result||"CLI 오류");return;}}
-          }
+          while((idx=buf.indexOf("\n"))>=0){var line=buf.slice(0,idx).replace(/\r$/,"");buf=buf.slice(idx+1);handleLine(line);}
         }else if(d.action==="stdErr"){raw+=String(d.data||"");}
         else if(d.action==="exit"){
-          if(!acc&&!resultText){
-            if(loginErr(raw)){finish(null,true);return;}
-            if(String(d.data)!=="0"){finish("claude 실행 실패 (exit "+d.data+") — CLI 설치/PATH·로그인 확인");return;}
-          }
-          finish(null);
+          var code=d.data;
+          /* exit 직후 바로 끝내지 않고 잠깐 대기 → 늦게 도착하는 마지막 stdOut(result=modelUsage/contextWindow 포함)을 놓치지 않음(레이스 방지) */
+          setTimeout(function(){
+            if(done)return;
+            if(buf&&buf.trim()){handleLine(buf.replace(/\r$/,""));buf="";}
+            if(!acc&&!resultText){
+              if(loginErr(raw)){finish(null,true);return;}
+              if(String(code)!=="0"){finish("claude 실행 실패 (exit "+code+") — CLI 설치/PATH·로그인 확인");return;}
+            }
+            finish(null);
+          },160);
         }
       };
       try{Neutralino.events.on("spawnedProcess",handler);}catch(e){}

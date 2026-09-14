@@ -420,6 +420,14 @@ window.__confirmReplaceDoc=async function(){
 };
 document.getElementById("fileInput").addEventListener("change",function(e){if(e.target.files&&e.target.files.length){if(window.__ingestFiles)window.__ingestFiles(e.target.files);else loadFile(e.target.files[0]);}e.target.value="";});
 document.getElementById("btnOpen").addEventListener("click",function(){if(window.__nativeOpen){window.__nativeOpen();return;}document.getElementById("fileInput").click();});
+/* 빈 문서로 시작(무제 새 탭) — 경로 없는 미저장 문서, 기본 템플릿 내용 */
+window.__newDoc=function(){
+  var BLANK="## 제목 없음\n\n내용 입력\n";
+  if(window.__openDoc){window.__openDoc({path:null,dir:null,name:"제목 없음.md",fname:"제목 없음",text:BLANK});}
+  else{window.__mdPath=null;window.__mdDir=null;window.__mdName="제목 없음.md";window.__fname="제목 없음";window.__drop={};document.body.classList.add("loaded");renderMarkdown(BLANK);}
+  var ta=document.getElementById("rawInput");if(ta){try{ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}catch(e){}}
+};
+var _btnNew=document.getElementById("btnNew");if(_btnNew)_btnNew.addEventListener("click",window.__newDoc);
 /* ---- 색상 테마 팔레트 (UI + 문서 + PDF 산출물 공통, CSS 변수로 라이브 반영) ---- */
 var THEMES=[
   {n:"로열 퍼플",b:"#4c1d95",a:"#7c3aed"},
