@@ -76,7 +76,7 @@
     var t=ta(),m=mirror();
     if(t)t.value=s.text;
     if(window.__setSaved)window.__setSaved(s.baseline);
-    document.body.classList.add("loaded");
+    document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayoutPanes();
     if(m&&typeof hlMd==="function")m.innerHTML=hlMd(s.text);
     if(typeof renderPreview==="function")renderPreview(s.text,false);
     if(t){t.scrollTop=s.scroll||0;if(m){m.scrollTop=t.scrollTop;m.scrollLeft=t.scrollLeft;}}
@@ -107,7 +107,7 @@
     /* 신규 탭 = 라이브에 실어 renderMarkdown 으로 로드(baseline clean, 미러·프리뷰·이미지 처리 일괄) */
     window.__mdPath=s.path;window.__mdDir=s.dir;window.__mdName=s.name;window.__fname=s.fname;
     window.__drop=s.drop;window.__imgFiles=[];
-    document.body.classList.add("loaded");
+    document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayoutPanes();
     if(typeof renderMarkdown==="function")renderMarkdown(s.text);
     if(window.__renderFileBadge)window.__renderFileBadge();
     renderTabs();

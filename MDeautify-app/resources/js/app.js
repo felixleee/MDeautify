@@ -344,7 +344,7 @@ function runPaged(src,keepScroll,attempt){
 async function renderPreview(text,keepScroll){
 window.__lastText=text;
 var src=buildSource(text);
-document.body.classList.add("loaded");
+document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayoutPanes();
 if(!keepScroll)setHead("페이지 분할 중...");   /* 편집 재렌더 땐 기존 'Total N' 유지 → 헤더 깜빡임 방지(내용은 화면 밖에서 조판 후 교체) */
 /* EXE(Neutralino)에서 로컬 이미지 경로(![](example.png))를 .md 폴더 기준으로 읽어 data URI로 치환. 브라우저에선 훅 없음. */
 if(typeof window.__resolveLocalImages==="function"){try{await window.__resolveLocalImages(src);}catch(e){}}
@@ -424,7 +424,7 @@ document.getElementById("btnOpen").addEventListener("click",function(){if(window
 window.__newDoc=function(){
   var BLANK="## 제목 없음\n\n내용 입력\n";
   if(window.__openDoc){window.__openDoc({path:null,dir:null,name:"제목 없음.md",fname:"제목 없음",text:BLANK});}
-  else{window.__mdPath=null;window.__mdDir=null;window.__mdName="제목 없음.md";window.__fname="제목 없음";window.__drop={};document.body.classList.add("loaded");renderMarkdown(BLANK);}
+  else{window.__mdPath=null;window.__mdDir=null;window.__mdName="제목 없음.md";window.__fname="제목 없음";window.__drop={};document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayoutPanes();renderMarkdown(BLANK);}
   var ta=document.getElementById("rawInput");if(ta){try{ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);}catch(e){}}
 };
 var _btnNew=document.getElementById("btnNew");if(_btnNew)_btnNew.addEventListener("click",window.__newDoc);
@@ -547,13 +547,27 @@ var _btnOpenTop=document.getElementById("btnOpenTop");if(_btnOpenTop)_btnOpenTop
   });
 })();
 /* MD 원본/미리보기 리사이즈 핸들 + 가운데 접기/펼치기 */
-(function(){var main=document.getElementById("main"),editor=document.getElementById("editor"),sp=document.getElementById("splitter"),fb=document.getElementById("foldBtn");if(!main||!editor||!sp||!fb)return;var ico=fb.querySelector(".fold-ico"),lastBasis="42%",dragging=false;
+(function(){var main=document.getElementById("main"),editor=document.getElementById("editor"),sp=document.getElementById("splitter"),fb=document.getElementById("foldBtn");if(!main||!editor||!sp||!fb)return;var viewer=document.getElementById("viewer");var ico=fb.querySelector(".fold-ico"),lastBasis="50%",dragging=false,ratio=.5;
 function setIco(){ico.textContent=document.body.classList.contains("editor-collapsed")?"›":"‹";}
 fb.addEventListener("mousedown",function(e){e.stopPropagation();});
-fb.addEventListener("click",function(e){e.stopPropagation();var c=document.body.classList.toggle("editor-collapsed");if(!c)editor.style.flex="0 0 "+lastBasis;setIco();});
+fb.addEventListener("click",function(e){e.stopPropagation();var c=document.body.classList.toggle("editor-collapsed");if(!c){editor.style.flex="0 0 "+lastBasis;relayout();}setIco();});
 sp.addEventListener("mousedown",function(e){if(e.target===fb||fb.contains(e.target))return;dragging=true;document.body.style.userSelect="none";document.body.style.cursor="col-resize";if(document.body.classList.contains("editor-collapsed")){document.body.classList.remove("editor-collapsed");setIco();}e.preventDefault();});
-window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.getBoundingClientRect();var er=editor.getBoundingClientRect();var w=e.clientX-er.left;/* 편집기 실제 왼쪽 기준(탐색기+리사이저 폭 오프셋 반영) */var maxW=r.right-er.left-266;if(maxW<180)maxW=180;w=Math.max(180,Math.min(maxW,w));editor.style.flex="0 0 "+w+"px";lastBasis=w+"px";});
+window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.getBoundingClientRect();var er=editor.getBoundingClientRect();var w=e.clientX-er.left;/* 편집기 실제 왼쪽 기준(탐색기+리사이저 폭 오프셋 반영) */var maxW=r.right-er.left-266;if(maxW<180)maxW=180;w=Math.max(180,Math.min(maxW,w));editor.style.flex="0 0 "+w+"px";lastBasis=w+"px";var av=avail();if(av>0)ratio=w/av;});
 window.addEventListener("mouseup",function(){if(dragging){dragging=false;document.body.style.userSelect="";document.body.style.cursor="";}});
+/* 편집기·미리보기 폭 재계산 — 탐색기와 AI 패널을 뺀 구간만을 기준으로 비율(기본 반반)대로 나눈다.
+   비율은 스플리터를 끌면 갱신되고, 패널이 열리거나 닫히거나 창 크기가 바뀌면 그 비율대로 다시 배분한다. */
+function avail(){var t=main.clientWidth,cs=main.children;for(var i=0;i<cs.length;i++){var c=cs[i];if(c===editor||c===viewer)continue;t-=c.getBoundingClientRect().width;}return t;}
+function relayout(){
+  if(!viewer||dragging||document.body.classList.contains("editor-collapsed"))return;
+  if(!editor.offsetWidth&&!viewer.offsetWidth)return;
+  var a=avail();if(!(a>0))return;
+  var maxW=a-260;if(maxW<180)maxW=180;
+  var w=Math.max(180,Math.min(maxW,Math.round(a*ratio)));
+  if(Math.abs(editor.getBoundingClientRect().width-w)<.5)return;
+  editor.style.flex="0 0 "+w+"px";lastBasis=w+"px";
+}
+window.__relayoutPanes=relayout;setTimeout(relayout,0);
+window.addEventListener("resize",relayout);
 setIco();})();
 /* MD 원본 ↔ 미리보기 비율 스크롤 동기화. 한쪽의 스크롤 비율을 반대쪽에 반영.
    lockUntil: 프로그램적 스크롤이 되돌려 트리거하는 피드백 루프 차단(짧은 시간 창 동안 상호 이벤트 무시).

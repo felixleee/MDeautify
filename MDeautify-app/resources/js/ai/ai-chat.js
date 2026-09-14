@@ -322,6 +322,7 @@
     var rez=$("aiResizer");if(rez)rez.hidden=!open;
     var btn=$("btnAI");if(btn)btn.classList.toggle("on",open);
     try{localStorage.setItem("md2pdf_ai_open",open?"1":"0");}catch(e){}
+    if(window.__relayoutPanes)window.__relayoutPanes();
     if(open){refreshState();checkAvail();setTimeout(function(){try{inputEl.focus();}catch(e){}},0);}
   }
   function toggleOpen(){setOpen(panel&&panel.hidden);}
@@ -347,9 +348,9 @@
     var rez=$("aiResizer"),main=$("main");if(!rez||!main)return;
     var dragging=false,lastW=340;
     rez.addEventListener("mousedown",function(e){dragging=true;rez.classList.add("drag");document.body.style.userSelect="none";document.body.style.cursor="col-resize";e.preventDefault();});
-    window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.getBoundingClientRect();var w=r.right-e.clientX;w=Math.max(240,Math.min(640,w));if(w>r.width-260)w=Math.max(240,r.width-260);panel.style.flex="0 0 "+w+"px";lastW=w;});
+    window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.getBoundingClientRect();var w=r.right-e.clientX;w=Math.max(240,Math.min(640,w));if(w>r.width-260)w=Math.max(240,r.width-260);panel.style.flex="0 0 "+w+"px";lastW=w;if(window.__relayoutPanes)window.__relayoutPanes();});
     window.addEventListener("mouseup",function(){if(!dragging)return;dragging=false;rez.classList.remove("drag");document.body.style.userSelect="";document.body.style.cursor="";try{localStorage.setItem("md2pdf_ai_w",String(Math.round(lastW)));}catch(e){}});
-    rez.addEventListener("dblclick",function(){panel.style.flex="0 0 340px";try{localStorage.removeItem("md2pdf_ai_w");}catch(e){}});
+    rez.addEventListener("dblclick",function(){panel.style.flex="0 0 340px";if(window.__relayoutPanes)window.__relayoutPanes();try{localStorage.removeItem("md2pdf_ai_w");}catch(e){}});
   }
 
   function init(){

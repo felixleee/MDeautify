@@ -282,6 +282,7 @@
   function setOpen(open){
     document.body.classList.toggle("explorer-collapsed",!open);
     if(btn)btn.classList.toggle("on",open);
+    if(window.__relayoutPanes)window.__relayoutPanes();
     try{localStorage.setItem(OKEY,open?"1":"0");}catch(e){}
   }
   function toggleOpen(){setOpen(document.body.classList.contains("explorer-collapsed"));}
@@ -294,6 +295,7 @@
     var open=(saved===null)?(folders.length>0):(saved==="1");
     document.body.classList.toggle("explorer-collapsed",!open);
     if(btn)btn.classList.toggle("on",open);
+    if(window.__relayoutPanes)window.__relayoutPanes();
   }
 
   async function expandRoots(){
@@ -321,7 +323,7 @@
       var r=main.getBoundingClientRect(),w=e.clientX-r.left;
       w=Math.max(120,Math.min(560,w));
       if(w>r.width-260)w=Math.max(120,r.width-260);
-      explorer.style.flex="0 0 "+w+"px";lastW=w;
+      explorer.style.flex="0 0 "+w+"px";lastW=w;if(window.__relayoutPanes)window.__relayoutPanes();
     });
     window.addEventListener("mouseup",function(){
       if(!dragging)return;dragging=false;rez.classList.remove("drag");

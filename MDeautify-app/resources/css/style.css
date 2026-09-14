@@ -136,7 +136,7 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #tmDark:checked::after{content:"\1F319";}
 #bar .spacer{margin-left:auto;}
 #main{flex:1 1 auto;display:flex;min-height:0;}
-#editor{flex:0 0 42%;min-height:0;position:relative;overflow:hidden;background:var(--ui-editor-bg);display:flex;flex-direction:column;}
+#editor{flex:0 0 50%;min-height:0;position:relative;overflow:hidden;background:var(--ui-editor-bg);display:flex;flex-direction:column;}
 /* 탭바 + 본문 래퍼: 편집기 자식(#findHl/#raw/#rawInput)이 inset:0 absolute 라 positioned ancestor 를 #editorBody 로 둔다 */
 #editorBody{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;}
 #tabBar{flex:0 0 auto;display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;background:var(--ui-editor-bg);border-bottom:1px solid var(--tm-border);}
@@ -413,6 +413,11 @@ body.loaded #fileBadge{display:inline-flex;}
 #aiSend:hover:not(:disabled){background:color-mix(in srgb,var(--ui-brand-accent) 16%,transparent);}
 #aiSend:disabled{opacity:.5;cursor:default;}
 #aiStop{background:transparent;color:var(--st-bad);border-color:var(--st-bad);}
+#bar button#btnAI{display:inline-flex;align-items:center;gap:0;white-space:nowrap;height:35px;padding:0 10px;overflow:hidden;}
+#bar button#btnAI svg{display:block;flex:0 0 auto;}
+#bar button#btnAI .ai-lbl{display:inline-block;max-width:0;margin-left:0;opacity:0;overflow:hidden;transition:max-width .2s ease,margin-left .2s ease,opacity .16s ease;}
+#bar button#btnAI:hover .ai-lbl,#bar button#btnAI:focus-visible .ai-lbl{max-width:4.4em;margin-left:6px;opacity:1;}
+@media (prefers-reduced-motion:reduce){#bar button#btnAI .ai-lbl{transition:none;}}
 #btnAI.on{background:color-mix(in srgb,var(--ui-brand-accent) 18%,transparent);color:var(--ui-brand-accent);}
 .ai-setup{flex:0 0 auto;margin:12px;padding:14px;border:1px solid var(--tm-border);border-radius:10px;background:var(--tm-hover-bg);}
 .ai-setup[hidden]{display:none;}
