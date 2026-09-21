@@ -153,8 +153,17 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #tabBar .tab.dirty .tab-x{display:none;}
 #tabBar .tab.dirty:hover .tab-dot{display:none;}
 #tabBar .tab.dirty:hover .tab-x{display:inline-flex;}
-#viewer{flex:1 1 auto;min-height:0;overflow:auto;background:var(--ui-viewer-bg);display:flex;flex-direction:column;}
-body:not(.loaded) #editor,body:not(.loaded) #viewer,body:not(.loaded) #splitter{display:none;}
+/* AI 대화가 있는 문서 표시(별 3개) — 점과 같은 방식으로 항상 DOM 에 두고 CSS 로만 노출 */
+#tabBar .tab-ai{display:none;align-items:center;flex:0 0 auto;color:var(--ui-brand-accent);opacity:.9;}
+#tabBar .tab.has-ai .tab-ai{display:inline-flex;}
+/* 별이 붙는 탭은 좌우를 좁힌다 — 왼쪽 여백 12→8px, 별↔이름 간격 6→4px(gap 을 margin 으로 상쇄) */
+#tabBar .tab.has-ai{padding-left:8px;}
+#tabBar .tab.has-ai .tab-ai{margin-right:-2px;}
+/* 미리보기는 래퍼(고정 헤더 + 스크롤 영역)로 나뉜다. 헤더가 스크롤 컨테이너 밖에 있어야
+   가로 스크롤에도 제자리에 남는다(sticky 는 세로축만 잡아줌). #viewer 는 계속 스크롤 주체. */
+#pvWrap{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:var(--ui-viewer-bg);}
+#viewer{flex:1 1 auto;min-height:0;overflow:auto;background:var(--ui-viewer-bg);}
+body:not(.loaded) #editor,body:not(.loaded) #pvWrap,body:not(.loaded) #splitter{display:none;}
 #splitter{flex:0 0 6px;position:relative;cursor:col-resize;background:var(--ui-editor-border);}
 #splitter:hover{background:var(--ui-brand-accent);}
 #foldBtn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:18px;height:46px;padding:0;border:1px solid var(--ui-editor-border);border-radius:6px;background:var(--ui-bar-bg);color:var(--ui-bar-fg);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;z-index:3;}
@@ -521,7 +530,7 @@ select:focus{outline:none;box-shadow:0 0 0 3px color-mix(in srgb, var(--ui-brand
 /* 미러 토큰은 '색상만' — font-weight/style 등 레이아웃(폭·줄바꿈)에 영향 주는 속성 금지.
    특히 한글은 볼드가 더 넓어 헤더 줄바꿈이 달라지면 투명 textarea 커서와 어긋남(정합 깨짐). */
 #raw .mh{color:var(--sx-h);} #raw .mq{color:var(--sx-q);} #raw .ml{color:var(--sx-l);} #raw .mc{color:var(--sx-c);} #raw .mb{color:var(--sx-b);} #raw .mlk{color:var(--sx-lk);}
-.pv-head{position:sticky;top:0;background:var(--ui-pvhead-bg);color:var(--ui-pvhead-fg);text-align:center;padding:8px 0;font-size:12px;border-bottom:1px solid var(--ui-pvhead-border);z-index:1;}
+.pv-head{flex:0 0 auto;background:var(--ui-pvhead-bg);color:var(--ui-pvhead-fg);text-align:center;padding:8px 0;font-size:12px;border-bottom:1px solid var(--ui-pvhead-border);}
 #pages{padding:24px 12px;}
 #pages .paper{width:210mm;box-sizing:border-box;background:#fff;margin:0 auto;padding:18mm 15mm;box-shadow:0 3px 14px rgba(0,0,0,.28);}
 #pages .pagedjs_page{background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.3);margin:0 auto 34px !important;}
@@ -617,7 +626,7 @@ select:focus{outline:none;box-shadow:0 0 0 3px color-mix(in srgb, var(--ui-brand
   html,body{height:auto;overflow:visible;display:block;background:#fff;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
   #bar,#explorer,#exResizer,#editor,#drop,#themeModal,#settingsModal,#notesModal,#updModal,#splitter{display:none !important;}
   #main{display:block !important;min-height:0 !important;}
-  #viewer{display:block !important;overflow:visible !important;background:#fff !important;}
+  #pvWrap,#viewer{display:block !important;overflow:visible !important;background:#fff !important;}
   .pv-head{display:none !important;}
   #pages{padding:0 !important;margin:0 !important;}
   /* Paged.js 실제 페이지: 화면 전용 여백/그림자만 제거. 이미 최종 분할된 페이지이므로 재분할 규칙은 넣지 않음 */

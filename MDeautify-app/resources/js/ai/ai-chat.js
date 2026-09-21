@@ -29,7 +29,11 @@
   var panel,logEl,inputEl,sendBtn,stopBtn,ctxEl,modelEl,effortEl,mockHint,setupCard,inputWrap;
   var EFFORTS=[{v:"",t:"기본"},{v:"low",t:"낮음"},{v:"medium",t:"보통"},{v:"high",t:"높음"},{v:"xhigh",t:"매우 높음"},{v:"max",t:"최대"}];
   var INSTALL_URL="https://code.claude.com/docs/en/setup";
-  var msgs=[],busy=false,canceller=null;
+  /* 문서(탭)마다 독립된 대화. S = 지금 패널에 붙어 있는 세션.
+     말풍선은 DOM 노드째 보관한다 — innerHTML 로 저장/복원하면 '에디터에 삽입'·'복사'·'로그인 창 열기'
+     버튼의 이벤트 리스너가 조용히 죽는다. */
+  function newSession(){return {msgs:[],ctx:null,busy:false,stop:false,canceller:null,frag:null,cliSessionId:"",sentDoc:null,model:null,effort:null};}
+  var S=newSession();
 
   function scrollBottom(){if(logEl)logEl.scrollTop=logEl.scrollHeight;}
 
@@ -54,9 +58,9 @@
   }
   function fallbackCopy(t){try{var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();if(window.__toast)window.__toast("복사됨");}catch(e){}}
 
-  function setBusy(b){busy=b;if(sendBtn)sendBtn.disabled=b;if(inputEl)inputEl.disabled=b;}
+  function setBusy(b,sess){var t=sess||S;t.busy=b;if(t!==S)return;if(sendBtn)sendBtn.disabled=b;if(inputEl)inputEl.disabled=b;}
   /* 중단 버튼 표시 = 요청 보낸 뒤 답변이 나오기 전까지만. 표시 중엔 전송 버튼 숨김(자리 공유). */
-  function showStop(v){if(stopBtn)stopBtn.hidden=!v;if(sendBtn)sendBtn.hidden=v;}
+  function showStop(v,sess){var t=sess||S;t.stop=v;if(t!==S)return;if(stopBtn)stopBtn.hidden=!v;if(sendBtn)sendBtn.hidden=v;}
   /* textarea: 기본 높이에서 내용 따라 최대치(CSS max-height)까지 유동 확장 */
   function autoGrow(){if(!inputEl)return;inputEl.style.height="auto";inputEl.style.height=Math.min(inputEl.scrollHeight,140)+"px";}
 
@@ -90,35 +94,43 @@
   }
 
   function send(){
-    if(busy)return;
+    if(S.busy)return;
     var text=(inputEl.value||"").trim();
     if(!text)return;
     inputEl.value="";autoGrow();
-    msgs.push({role:"user",content:text});
+    var owner=S;   /* 응답 도중 탭을 옮겨도 이 대화의 주인은 고정 */
+    var docNow=currentContext();
+    /* 이어가는 대화에서는 문서가 실제로 바뀐 때만 다시 싣는다(매 턴 전문 재전송 방지) */
+    var docChanged=!!owner.cliSessionId&&docNow!==owner.sentDoc;
+    owner.msgs.push({role:"user",content:text});syncAiTab();
     var u=addBubble("user");u.body.textContent=text;
     var di=includedDocInfo();if(di)addDocChip(u.wrap,di);
     var a=addBubble("assistant");a.wrap.classList.add("streaming");
     a.body.textContent="작성 중…";
     var acc="",started=false;
-    setBusy(true);showStop(true);canceller=null;
+    setBusy(true,owner);showStop(true,owner);owner.canceller=null;
     provider.sendChat({
-      messages:msgs.slice(),
+      messages:owner.msgs.slice(),
       model:(modelEl&&modelEl.value)||provider.defaultModel,
       effort:(effortEl&&effortEl.value)||"",
-      system:currentContext(),
-      onDelta:function(t){if(!started){started=true;a.body.textContent="";showStop(false);}acc+=t;a.body.textContent=acc;scrollBottom();},
+      system:docNow,
+      sessionId:owner.cliSessionId,   /* 있으면 --resume 으로 이어감 */
+      docChanged:docChanged,
+      prevDoc:owner.sentDoc,   /* 변경분만 보낼 수 있게 직전에 보낸 문서를 함께 넘김 */
+      onDelta:function(t){if(!started){started=true;a.body.textContent="";showStop(false,owner);}acc+=t;a.body.textContent=acc;if(owner===S)scrollBottom();},
       onDone:function(){
         a.wrap.classList.remove("streaming");
-        setBusy(false);showStop(false);
-        if(acc.trim()){msgs.push({role:"assistant",content:acc});addActions(a.wrap,function(){return acc;});}
+        setBusy(false,owner);showStop(false,owner);
+        if(acc.trim()){owner.msgs.push({role:"assistant",content:acc});addActions(a.wrap,function(){return acc;});}
         else{a.body.textContent="(빈 응답)";}
-        scrollBottom();
+        syncAiTab();
+        if(owner===S)scrollBottom();
       },
       onError:function(e){
         a.wrap.classList.remove("streaming");a.wrap.classList.add("error");
         a.body.textContent="⚠ "+(e||"오류가 발생했습니다.");
-        msgs.pop();   /* 실패한 user 턴 제거(다음 요청 오염 방지) */
-        setBusy(false);showStop(false);scrollBottom();
+        owner.msgs.pop();syncAiTab();   /* 실패한 user 턴 제거(다음 요청 오염 방지) */
+        setBusy(false,owner);showStop(false,owner);if(owner===S)scrollBottom();
       },
       onNeedLogin:function(){
         a.wrap.classList.remove("streaming");a.wrap.classList.add("error");
@@ -129,10 +141,11 @@
           b.addEventListener("click",doLogin);
           row.appendChild(b);a.wrap.appendChild(row);
         }
-        msgs.pop();setBusy(false);showStop(false);scrollBottom();
+        owner.msgs.pop();syncAiTab();setBusy(false,owner);showStop(false,owner);if(owner===S)scrollBottom();
       },
-      onUsage:function(info){updateCtxBar(info);},
-      setCanceller:function(fn){canceller=fn;}
+      onUsage:function(info){updateCtxBar(info,owner);},
+      onSession:function(id){owner.cliSessionId=id;owner.sentDoc=docNow;},   /* 다음 턴부터 이 세션을 이어감 */
+      setCanceller:function(fn){owner.canceller=fn;}
     });
   }
 
@@ -146,7 +159,10 @@
     return CTX_LIMIT;
   }
   function updateCtxBar(info){
-    info=info||{};info.contextWindow=ctxWinFor(info);lastCtxInfo=info;   /* 창값 확정(캐시 반영) 후 저장 → 바·팝오버 일관 */
+    var sess=arguments[1]||S;
+    info=info||{};info.contextWindow=ctxWinFor(info);sess.ctx=info;
+    if(sess!==S)return;   /* 배경 문서의 응답이 지금 화면의 바를 건드리지 않게 */
+    lastCtxInfo=info;   /* 창값 확정(캐시 반영) 후 저장 → 바·팝오버 일관 */
     var bar=$("aiCtxBar");if(bar){
       var used=info.used||0,limit=info.contextWindow||CTX_LIMIT;
       if(used&&limit){
@@ -193,8 +209,9 @@
     if(popOpen){renderUsagePop();pop.hidden=false;}else pop.hidden=true;
   }
 
-  function stop(){if(canceller){try{canceller();}catch(e){}}setBusy(false);showStop(false);}
-  function clearChat(){msgs=[];if(logEl)logEl.innerHTML="";resetCtxBar();}
+  function syncAiTab(){if(window.__tabsSyncAi)window.__tabsSyncAi();}   /* 탭의 AI 별 표시 갱신 */
+  function stop(){if(S.canceller){try{S.canceller();}catch(e){}}setBusy(false,S);showStop(false,S);}
+  function clearChat(){S.msgs=[];S.ctx=null;S.cliSessionId="";S.sentDoc=null;if(logEl)logEl.innerHTML="";resetCtxBar();syncAiTab();}
 
   function refreshState(){if(mockHint)mockHint.hidden=(provider!==MOCK);}
   /* CLI 설치 감지 → 없으면 설치 안내 카드, 채팅 영역 숨김 */
@@ -328,6 +345,23 @@
   function toggleOpen(){setOpen(panel&&panel.hidden);}
   function applyWidth(){var w=null;try{w=parseInt(localStorage.getItem("md2pdf_ai_w"),10);}catch(e){}if(w&&w>=240&&w<=640)panel.style.flex="0 0 "+w+"px";}
   function applyOpenDefault(){var s=null;try{s=localStorage.getItem("md2pdf_ai_open");}catch(e){}setOpen(s==="1");}
+  /* 모델은 문서(탭)마다 기억한다. 세션에 값이 없으면(새 문서) 마지막으로 고른 값을 기본으로 쓴다. */
+  function lastModel(){
+    var v=null;try{v=localStorage.getItem("md2pdf_ai_model");}catch(e){}
+    return (v&&provider.models.some(function(m){return m.id===v;}))?v:provider.defaultModel;
+  }
+  function lastEffort(){
+    var v=null;try{v=localStorage.getItem("md2pdf_ai_effort");}catch(e){}
+    return EFFORTS.some(function(x){return x.v===v;})?v:"";
+  }
+  /* 문서가 활성화되는 순간 그 시점 값으로 고정 — 이후 다른 탭에서 바꿔도 이 문서는 안 따라간다.
+     Effort 는 ""(기본) 도 유효한 값이라 || 가 아니라 ==null 로 "고른 적 없음" 을 판정한다. */
+  function syncPicks(){
+    if(S.model==null)S.model=lastModel();
+    if(S.effort==null)S.effort=lastEffort();
+    if(modelEl)modelEl.value=S.model;
+    if(effortEl)effortEl.value=S.effort;
+  }
   function applyModel(){
     if(!modelEl)return;
     modelEl.innerHTML="";
@@ -353,6 +387,25 @@
     rez.addEventListener("dblclick",function(){panel.style.flex="0 0 340px";if(window.__relayoutPanes)window.__relayoutPanes();try{localStorage.removeItem("md2pdf_ai_w");}catch(e){}});
   }
 
+  /* ---- 문서(탭)별 대화 전환 ---- */
+  /* 지금 붙어 있는 대화를 떼어 반환. 말풍선은 DocumentFragment 로 옮겨 리스너를 살린다. */
+  window.__aiHasMsgs=function(){return !!(S&&S.msgs&&S.msgs.length);};   /* 탭이 활성 문서의 대화 유무를 물을 때 */
+  window.__aiSnapshot=function(){
+    if(logEl){var f=document.createDocumentFragment();while(logEl.firstChild)f.appendChild(logEl.firstChild);S.frag=f;}
+    return S;
+  };
+  /* 다른 문서의 대화를 붙임. 없으면(새 문서) 빈 세션으로 시작. */
+  window.__aiRestore=function(sess){
+    S=sess||newSession();
+    if(logEl){logEl.innerHTML="";if(S.frag){logEl.appendChild(S.frag);S.frag=null;}}
+    if(sendBtn){sendBtn.disabled=!!S.busy;sendBtn.hidden=!!S.stop;}
+    if(inputEl)inputEl.disabled=!!S.busy;   /* 배경에서 생성 중이던 문서로 돌아오면 잠금도 따라온다 */
+    if(stopBtn)stopBtn.hidden=!S.stop;
+    syncPicks();   /* 이 문서에서 고른 모델로 선택기를 되돌린다 */
+    if(S.ctx)updateCtxBar(S.ctx,S);else resetCtxBar();
+    scrollBottom();
+  };
+
   function init(){
     panel=$("aiPanel");if(!panel)return;
     logEl=$("aiLog");inputEl=$("aiInput");sendBtn=$("aiSend");stopBtn=$("aiStop");
@@ -375,8 +428,8 @@
     if(inputEl)inputEl.addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});
     if(inputEl)inputEl.addEventListener("input",autoGrow);
     autoGrow();
-    if(modelEl)modelEl.addEventListener("change",function(){try{localStorage.setItem("md2pdf_ai_model",modelEl.value);}catch(e){}});
-    if(effortEl)effortEl.addEventListener("change",function(){try{localStorage.setItem("md2pdf_ai_effort",effortEl.value);}catch(e){}});
+    if(modelEl)modelEl.addEventListener("change",function(){S.model=modelEl.value;try{localStorage.setItem("md2pdf_ai_model",modelEl.value);}catch(e){}});
+    if(effortEl)effortEl.addEventListener("change",function(){S.effort=effortEl.value;try{localStorage.setItem("md2pdf_ai_effort",effortEl.value);}catch(e){}});
     document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==="a"||e.key==="A")){e.preventDefault();toggleOpen();}});
     applyModel();applyEffort();initResizer();applyWidth();applyOpenDefault();
   }

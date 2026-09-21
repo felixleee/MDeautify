@@ -27,6 +27,17 @@
 
   function el(tag,cls){var d=document.createElement(tag);if(cls)d.className=cls;return d;}
 
+  /* ---- AI 대화 표시(별 3개) ---- */
+  /* 활성 탭은 s.ai 가 마지막 스냅샷이라 뒤처진다 → 살아있는 세션에 직접 묻는다.
+     비활성 탭의 s.ai 는 세션 객체 그대로라 msgs 가 실시간으로 자란다. */
+  function hasAi(s){
+    if(s.id===activeId&&window.__aiHasMsgs)return window.__aiHasMsgs();
+    return !!(s.ai&&s.ai.msgs&&s.ai.msgs.length);
+  }
+  /* 별 1개(4각 스파클) — 16x16 박스를 꽉 채우도록 가운데 정렬 */
+  var AI_SVG='<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">'+
+    '<path d="M8,1 C8,6.25 6.25,8 1,8 C6.25,8 8,9.75 8,15 C8,9.75 9.75,8 15,8 C9.75,8 8,6.25 8,1 Z"/></svg>';
+
   /* ---- 렌더 ---- */
   function renderTabs(){
     ensureBar();if(!bar)return;
@@ -34,13 +45,15 @@
     bar.hidden=false;
     bar.innerHTML="";
     sessions.forEach(function(s){
-      var t=el("div","tab"+(s.id===activeId?" active":"")+(isDirty(s)?" dirty":""));
+      var ai=hasAi(s);
+      var t=el("div","tab"+(s.id===activeId?" active":"")+(isDirty(s)?" dirty":"")+(ai?" has-ai":""));
       t.setAttribute("data-id",s.id);
-      t.title=s.path||s.name;
+      t.title=(s.path||s.name)+(ai?"  ·  AI 대화 있음":"");
+      var sp=el("span","tab-ai");sp.setAttribute("aria-hidden","true");sp.innerHTML=AI_SVG;
       var nm=el("span","tab-name");nm.textContent=s.name||"문서";
       var dot=el("span","tab-dot");dot.setAttribute("aria-hidden","true");
       var x=el("button","tab-x");x.type="button";x.title="닫기";x.setAttribute("aria-label","닫기");x.innerHTML="&#10005;";
-      t.appendChild(nm);t.appendChild(dot);t.appendChild(x);
+      t.appendChild(sp);t.appendChild(nm);t.appendChild(dot);t.appendChild(x);
       t.addEventListener("mousedown",function(e){   /* 가운데 클릭=닫기 */
         if(e.button===1){e.preventDefault();closeTab(s.id);}
       });
@@ -67,6 +80,7 @@
     s.name=window.__mdName||s.name;s.fname=window.__fname||s.fname;
     s.drop=window.__drop||{};s.imgFiles=window.__imgFiles||[];
     if(t)s.scroll=t.scrollTop;
+    if(window.__aiSnapshot)s.ai=window.__aiSnapshot();   /* AI 대화도 문서에 딸려 보관 */
   }
 
   /* 세션 → 라이브(전환/복원): baseline 보존(dirty 유지), renderMarkdown 안 씀(그건 baseline 을 clean 으로 리셋) */
@@ -82,6 +96,7 @@
     if(t){t.scrollTop=s.scroll||0;if(m){m.scrollTop=t.scrollTop;m.scrollLeft=t.scrollLeft;}}
     var fh=document.getElementById("findHl");if(fh)fh.innerHTML="";   /* 이전 탭의 찾기 하이라이트 잔상 제거 */
     if(window.__renderFileBadge)window.__renderFileBadge();
+    if(window.__aiRestore)window.__aiRestore(s.ai);   /* 이 문서의 대화로 교체(없으면 새 대화) */
   }
 
   function switchTo(id){
@@ -110,6 +125,7 @@
     document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayoutPanes();
     if(typeof renderMarkdown==="function")renderMarkdown(s.text);
     if(window.__renderFileBadge)window.__renderFileBadge();
+    if(window.__aiRestore)window.__aiRestore(s.ai);   /* 새 문서 = 새 대화(restore 를 안 거치는 경로라 여기서 직접) */
     renderTabs();
   }
 
@@ -172,6 +188,18 @@
       var chip=bar&&bar.querySelector('.tab[data-id="'+activeId+'"]');
       if(chip)chip.classList.toggle("dirty",!!curDirty);
     },120);
+  };
+
+  /* AI 대화가 생기거나 비워질 때 별 표시만 갱신(ai-chat 이 호출) */
+  window.__tabsSyncAi=function(){
+    if(!bar)return;
+    sessions.forEach(function(s){
+      var chip=bar.querySelector('.tab[data-id="'+s.id+'"]');
+      if(!chip)return;
+      var ai=hasAi(s);
+      chip.classList.toggle("has-ai",ai);
+      chip.title=(s.path||s.name)+(ai?"  ·  AI 대화 있음":"");
+    });
   };
 
   window.__openDoc=openDoc;

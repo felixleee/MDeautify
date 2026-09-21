@@ -284,17 +284,16 @@ function runPaged(src,keepScroll,attempt){
   var myGen=(window.__pgGen=(window.__pgGen||0)+1);   /* 이 조판의 세대 번호. 더 새 조판이 시작되면 이 결과는 폐기(탭 전환·연속 편집 경쟁 방지) */
   var pages=document.getElementById("pages");
   var viewer=document.getElementById("viewer");
-  var pvHead=document.querySelector(".pv-head");var headH=pvHead?pvHead.offsetHeight:0;  /* 스티키 헤더에 가린 높이 */
   var vMax=viewer.scrollHeight-viewer.clientHeight;
   var ratio=(keepScroll&&vMax>0)?viewer.scrollTop/vMax:0;
-  /* 재분할 전: 뷰어 상단(헤더 바로 아래)에 걸려 있던 소스 블록(data-sl)과 그 오프셋을 기록.
+  /* 재분할 전: 뷰어 상단에 걸려 있던 소스 블록(data-sl)과 그 오프셋을 기록.
      → 에디터 스크롤과 무관하게 '보고 있던 그 내용'을 기준으로 복원(비율/에디터앵커보다 안정). */
   var keepSl=null,keepOff=0;
   if(keepScroll){
     var vr0=viewer.getBoundingClientRect();
     var old=pages.querySelectorAll("[data-sl]");
     for(var i=0;i<old.length;i++){
-      var rel=old[i].getBoundingClientRect().top-vr0.top-headH;   /* 헤더 아래 기준 뷰어 내 위치 */
+      var rel=old[i].getBoundingClientRect().top-vr0.top;   /* 스크롤 영역 상단 기준 위치 */
       if(keepSl===null||rel<=0){keepSl=old[i].getAttribute("data-sl");keepOff=rel;}  /* 상단 경계를 지나친(=걸쳐 있는) 마지막 블록 */
       if(rel>0)break;   /* 첫 '완전히 아래' 블록을 만나면 중단 → 직전 것이 상단 걸침 */
     }
@@ -302,7 +301,7 @@ function runPaged(src,keepScroll,attempt){
   function restore(){
     if(keepScroll&&keepSl!==null){
       var el=pages.querySelector('[data-sl="'+keepSl+'"]');
-      if(el){var vr=viewer.getBoundingClientRect();var abs=el.getBoundingClientRect().top-vr.top+viewer.scrollTop;viewer.scrollTop=Math.max(0,abs-headH-keepOff);return;}
+      if(el){var vr=viewer.getBoundingClientRect();var abs=el.getBoundingClientRect().top-vr.top+viewer.scrollTop;viewer.scrollTop=Math.max(0,abs-keepOff);return;}
     }
     var m=viewer.scrollHeight-viewer.clientHeight;viewer.scrollTop=keepScroll?ratio*m:0;   /* 폴백: 앵커 블록 못 찾으면 비율 */
   }
@@ -541,12 +540,12 @@ var _btnOpenTop=document.getElementById("btnOpenTop");if(_btnOpenTop)_btnOpenTop
     if(!tgt)return;
     e.preventDefault();
     var vr=viewer.getBoundingClientRect();
-    var pvHead=document.querySelector(".pv-head");var headH=pvHead?pvHead.offsetHeight:0;
     var abs=tgt.getBoundingClientRect().top-vr.top+viewer.scrollTop;
-    viewer.scrollTo({top:Math.max(0,abs-headH-8),behavior:"smooth"});
+    viewer.scrollTo({top:Math.max(0,abs-8),behavior:"smooth"});
   });
 })();
 /* MD 원본/미리보기 리사이즈 핸들 + 가운데 접기/펼치기 */
+
 (function(){var main=document.getElementById("main"),editor=document.getElementById("editor"),sp=document.getElementById("splitter"),fb=document.getElementById("foldBtn");if(!main||!editor||!sp||!fb)return;var viewer=document.getElementById("viewer");var ico=fb.querySelector(".fold-ico"),lastBasis="50%",dragging=false,ratio=.5;
 function setIco(){ico.textContent=document.body.classList.contains("editor-collapsed")?"›":"‹";}
 fb.addEventListener("mousedown",function(e){e.stopPropagation();});
@@ -556,7 +555,7 @@ window.addEventListener("mousemove",function(e){if(!dragging)return;var r=main.g
 window.addEventListener("mouseup",function(){if(dragging){dragging=false;document.body.style.userSelect="";document.body.style.cursor="";}});
 /* 편집기·미리보기 폭 재계산 — 탐색기와 AI 패널을 뺀 구간만을 기준으로 비율(기본 반반)대로 나눈다.
    비율은 스플리터를 끌면 갱신되고, 패널이 열리거나 닫히거나 창 크기가 바뀌면 그 비율대로 다시 배분한다. */
-function avail(){var t=main.clientWidth,cs=main.children;for(var i=0;i<cs.length;i++){var c=cs[i];if(c===editor||c===viewer)continue;t-=c.getBoundingClientRect().width;}return t;}
+function avail(){var t=main.clientWidth,cs=main.children;for(var i=0;i<cs.length;i++){var c=cs[i];if(c===editor||c.contains(viewer))continue;t-=c.getBoundingClientRect().width;}return t;}
 function relayout(){
   if(!viewer||dragging||document.body.classList.contains("editor-collapsed"))return;
   if(!editor.offsetWidth&&!viewer.offsetWidth)return;
@@ -601,13 +600,9 @@ setIco();})();
   }
   function anchors(){var k=viewer.querySelectorAll("#pages [data-sl]").length+"|"+rawInput.scrollHeight+"|"+viewer.scrollHeight+"|"+rawInput.clientWidth+"|"+viewer.clientHeight;if(k!==ckey){cache=build();ckey=k;}return cache;}
   function interp(A,fk,tk,v){for(var i=0;i<A.length-1;i++){var a=A[i],b=A[i+1];if(v>=a[fk]&&v<=b[fk]){var s=b[fk]-a[fk];return a[tk]+(s>0?(v-a[fk])/s:0)*(b[tk]-a[tk]);}}return v<=A[0][fk]?A[0][tk]:A[A.length-1][tk];}
-  var pvHead=document.querySelector(".pv-head");
-  function headH(){return pvHead?pvHead.offsetHeight:0;}  /* 뷰어 상단 스티키 헤더 높이 — 동기 대상이 이 밑에 가리지 않게 보정 */
   function linkFn(from,to,fk,tk){from.addEventListener("scroll",function(){if(clock()<lockUntil)return;if(document.body.classList.contains("editor-collapsed"))return;var A=anchors();if(!A||A.length<2)return;
-    var h=headH();
-    var q=(from===viewer)?from.scrollTop+h:from.scrollTop;   /* 뷰어가 소스면: 헤더에 가린 만큼 아래가 실제 보이는 상단 */
+    var q=from.scrollTop;
     var y=interp(A,fk,tk,q);if(y==null)return;
-    if(to===viewer)y=y-h;                                    /* 뷰어가 대상이면: 헤더 바로 아래로 내려 가림 방지 */
     lockUntil=clock()+80;to.scrollTop=Math.max(0,y);
     if(to===rawInput){mirror.scrollTop=rawInput.scrollTop;mirror.scrollLeft=rawInput.scrollLeft;}  /* 미리보기 스크롤로 편집기가 움직일 때 색상 미러도 즉시 맞춰 커서-글자 정합 유지 */
   });}
