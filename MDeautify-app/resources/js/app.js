@@ -28,6 +28,10 @@ Object.keys(meta).forEach(function(k){if(special[k])return;rows+="<tr><td class=
 if(!title&&!subtitle&&!rows)return"";
 return "<div class='cover'>"+(kicker?"<div class='kicker'>"+esc(kicker)+"</div>":"")+"<h1>"+esc(title)+"</h1><div class='st'>"+esc(subtitle)+"</div><div class='bar'></div>"+(rows?"<table>"+rows+"</table>":"")+"</div>";}
 
+/* 페이지 방향(orient.js 가 window.__pageOrient 설정). 세로 297mm / 가로 210mm 높이. */
+function pageH(){return window.__pageOrient==="landscape"?210:297;}
+/* Paged.js 에 넘길 CSS — @page 의 size 에 방향을 끼워 넣는다 */
+function pagedCss(){return PAGED_CSS.replace("size:A4;","size:A4 "+(window.__pageOrient==="landscape"?"landscape":"portrait")+";");}
 var PAGED_CSS="@page{size:A4;margin:18mm 15mm;@bottom-center{content:counter(page);font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}@top-center{content:' ';font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}}.content h1,.content h2,.content h3,.content h4{break-after:avoid-page;-webkit-column-break-after:avoid;}.content tr,.content img,.content svg,.content figure{break-inside:avoid;}.content table,.content ul,.content ol,.content pre,.content blockquote{break-inside:auto;}.content thead{break-after:avoid;}.pb-before{break-before:page;}.cover{break-after:page;}.toc{break-after:page;}.content p,.content li{orphans:2;widows:2;}";
 
 /* 경량 구문 강조기: 주석/문자열/숫자/키워드/함수명 토큰만 span으로 감쌈(정식 파서 아님, 다국어 공통) */
@@ -263,8 +267,9 @@ function applyWidowHeadingBreaks(src){
     if(!box)continue;
     var br=box.getBoundingClientRect(),hr=h.getBoundingClientRect();
     if(br.height<=0)continue;
-    var contentBottom=br.bottom - br.height*(18/297);   // page bottom margin (18mm/297mm)
-    var contentH=br.height*(261/297);                    // content area height
+    var ph=pageH();                                      // 페이지 높이(mm) — 방향에 따라 297 또는 210
+    var contentBottom=br.bottom - br.height*(18/ph);     // 아래 여백 18mm
+    var contentH=br.height*((ph-36)/ph);                 // 본문 영역 높이(위아래 18mm 제외)
     var remaining=contentBottom - hr.top;                // space from heading top to content bottom
     if(remaining>0 && remaining < contentH*0.35){
       if(sh[i] && !sh[i].classList.contains("pb-before")){sh[i].classList.add("pb-before");changed=true;}
@@ -276,7 +281,7 @@ function paginate(src){
 var pages=document.getElementById("pages");pages.innerHTML="";
 var paper=document.createElement("div");paper.className="paper";paper.innerHTML=src.innerHTML;pages.appendChild(paper);
 var head=document.getElementById("pvHead");
-try{var r=document.createElement("div");r.style.cssText="position:absolute;left:-9999px;width:100mm;height:10mm;";document.body.appendChild(r);var pxmm=r.offsetWidth/100;document.body.removeChild(r);var pc=(297-36)*pxmm;var n=(pc>0&&paper.scrollHeight>0)?Math.max(1,Math.ceil(paper.scrollHeight/pc)):0;if(head)head.textContent=n?("미리보기 · 약 "+n+"페이지 (저장/인쇄 시 자동 페이지 분할)"):"미리보기 (저장/인쇄 시 자동 페이지 분할)";}catch(e){if(head)head.textContent="미리보기";}
+try{var r=document.createElement("div");r.style.cssText="position:absolute;left:-9999px;width:100mm;height:10mm;";document.body.appendChild(r);var pxmm=r.offsetWidth/100;document.body.removeChild(r);var pc=(pageH()-36)*pxmm;var n=(pc>0&&paper.scrollHeight>0)?Math.max(1,Math.ceil(paper.scrollHeight/pc)):0;if(head)head.textContent=n?("미리보기 · 약 "+n+"페이지 (저장/인쇄 시 자동 페이지 분할)"):"미리보기 (저장/인쇄 시 자동 페이지 분할)";}catch(e){if(head)head.textContent="미리보기";}
 document.getElementById("viewer").scrollTop=0;
 }
 function runPaged(src,keepScroll,attempt){
@@ -306,7 +311,7 @@ function runPaged(src,keepScroll,attempt){
     var m=viewer.scrollHeight-viewer.clientHeight;viewer.scrollTop=keepScroll?ratio*m:0;   /* 폴백: 앵커 블록 못 찾으면 비율 */
   }
   if(!window.PagedModule||!window.PagedModule.Previewer){pages.innerHTML="";fallbackRender(src);restore();return;}
-  var blobUrl=null;try{blobUrl=URL.createObjectURL(new Blob([PAGED_CSS],{type:"text/css"}));}catch(e){}
+  var blobUrl=null;try{blobUrl=URL.createObjectURL(new Blob([pagedCss()],{type:"text/css"}));}catch(e){}
   /* 새 조판은 화면 밖 임시 컨테이너에서 완료한 뒤 한 번에 교체 → 편집 중 '기존 내용이 비었다가 다시 채워지는' 깜빡임 제거.
      교체 전까지 기존 미리보기가 그대로 보이고, 완료 순간 새 내용+스크롤 복원이 같은 프레임에 반영됨.
      화면 밖(left:-99999px)이라 사용자에게 안 보이지만 정상 레이아웃/측정되어 Paged.js 분할 계산에 영향 없음. */
@@ -318,7 +323,7 @@ function runPaged(src,keepScroll,attempt){
   function fail(err){if(myGen!==window.__pgGen){dropStaging();return;}if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();}
   /* 콘텐츠 맨 앞에 <style> 태그를 붙이면 Paged.js 가 첫 페이지를 복제하는 버그가 있다(표지 없는 문서에서 발현).
      → PAGED_CSS 는 스타일시트(blobUrl)로만 넘기고, blob 생성 실패 시에만 인라인 <style> 폴백. */
-  var content=blobUrl?src.innerHTML:("<style>"+PAGED_CSS+"</style>"+src.innerHTML);
+  var content=blobUrl?src.innerHTML:("<style>"+pagedCss()+"</style>"+src.innerHTML);
   try{
     var prev=new window.PagedModule.Previewer();
     prev.preview(content, blobUrl?[blobUrl]:[], staging).then(function(flow){

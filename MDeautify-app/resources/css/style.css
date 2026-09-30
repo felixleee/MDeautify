@@ -533,6 +533,12 @@ select:focus{outline:none;box-shadow:0 0 0 3px color-mix(in srgb, var(--ui-brand
 .pv-head{flex:0 0 auto;background:var(--ui-pvhead-bg);color:var(--ui-pvhead-fg);text-align:center;padding:8px 0;font-size:12px;border-bottom:1px solid var(--ui-pvhead-border);}
 #pages{padding:24px 12px;}
 #pages .paper{width:210mm;box-sizing:border-box;background:#fff;margin:0 auto;padding:18mm 15mm;box-shadow:0 3px 14px rgba(0,0,0,.28);}
+/* 가로 방향 — 페이지 크기 자체는 pageSizeCss(orient.js), 여기선 선택자로 묶이는 것만.
+   이미지 상한은 본문 높이 기준: 세로 261mm→250mm, 가로 174mm→165mm(안 줄이면 페이지를 넘김).
+   표지 여백도 본문 높이에 비례(60/261 ≈ 40/174). */
+body.landscape #pages .paper,body.landscape #pages .fallback-doc{width:297mm;}
+body.landscape .content img,body.landscape .content figure img{max-height:165mm;}
+body.landscape .cover{padding-top:40mm;}
 #pages .pagedjs_page{background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.3);margin:0 auto 34px !important;}
 #pages .pagedjs_pages{display:block;}
 /* 페이지 상단 시작 위치 일정하게: 각 페이지 첫 요소 margin-top 제거 */
@@ -619,10 +625,11 @@ select:focus{outline:none;box-shadow:0 0 0 3px color-mix(in srgb, var(--ui-brand
 .toc .toc-l2{padding-left:18px;}
 .toc .toc-l3{padding-left:36px;font-size:calc(var(--doc-size) * 0.88);}
 /* print: WYSIWYG — 화면에 그려진 Paged.js 페이지를 그대로 인쇄 (미리보기와 100% 동일) */
-@page{size:A4;margin:0;}
+/* 페이지 크기는 orient.js 가 <style id="pageSizeCss"> 로 단독 관리 — 여기선 여백만 */
+@page{margin:0;}
 @media print{
   /* PAGED_CSS에서 새어 나온 @page{margin:18mm 15mm} 무력화 — 물리 여백 0, 여백은 페이지 박스에 이미 포함 */
-  @page{size:A4;margin:0 !important;}
+  @page{margin:0 !important;}
   html,body{height:auto;overflow:visible;display:block;background:#fff;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
   #bar,#explorer,#exResizer,#editor,#drop,#themeModal,#settingsModal,#notesModal,#updModal,#splitter{display:none !important;}
   #main{display:block !important;min-height:0 !important;}

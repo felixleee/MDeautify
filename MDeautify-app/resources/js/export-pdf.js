@@ -66,12 +66,14 @@
   async function buildStandaloneHtml(){
     var pages=document.getElementById("pages");
     var rootStyle=(document.documentElement.getAttribute("style")||"").replace(/"/g,"&quot;");
+    var land=(window.__pageOrient==="landscape");
     var css=await inlineFonts(collectCss());
     return "<!doctype html><html lang='ko' style=\""+rootStyle+"\"><head><meta charset='utf-8'>"+
       "<style>"+css+"</style>"+
       /* 안전장치: 규칙 누락 대비 물리 여백 0 + 배경색 인쇄 강제 */
-      "<style>@page{size:A4;margin:0!important;}html,body{margin:0!important;padding:0!important;background:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}</style>"+
-      "</head><body class='loaded'><div id='main'><section id='viewer'><div id='pages'>"+
+      /* size 를 여기서 다시 못 박는다 — collectCss 뒤에 오므로 이 선언이 최종. 방향을 빠뜨리면 세로로 돌아간다. */
+      "<style>@page{size:A4 "+(land?"landscape":"portrait")+";margin:0!important;}html,body{margin:0!important;padding:0!important;background:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}</style>"+
+      "</head><body class='loaded"+(land?" landscape":"")+"'><div id='main'><section id='viewer'><div id='pages'>"+
       pages.innerHTML+
       "</div></section></div></body></html>";
   }

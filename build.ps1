@@ -56,6 +56,9 @@ if ($doExe) {
       & $rcedit $outExe `
         --set-version-string "FileDescription" "MDeautify - Markdown to PDF" `
         --set-version-string "ProductName" "MDeautify" `
+        --set-version-string "CompanyName" "felixleee" `
+        --set-version-string "LegalCopyright" "Copyright (c) 2026 felixleee" `
+        --set-version-string "OriginalFilename" "MDeautify.exe" `
         --set-file-version "$ver.0" `
         --set-product-version "$ver" 2>$null | Out-Null
       if ($LASTEXITCODE -eq 0) { $rcOk = $true; break }
