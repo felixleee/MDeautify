@@ -568,7 +568,7 @@ body.landscape .cover{padding-top:40mm;}
 .content p{margin:8px 0;overflow-wrap:anywhere;} .content ul,.content ol{margin:8px 0;padding-left:20px;} .content li{margin:3px 0;overflow-wrap:anywhere;}
 .content h1,.content h2,.content h3,.content h4{overflow-wrap:anywhere;}
 .content strong,.content b{color:#0f172a;}
-.content code{font-family:"Cascadia Code","Cascadia Mono",Consolas,"DejaVu Sans Mono",monospace;font-size:calc(var(--doc-size) * 0.857);background:#f1f5f9;padding:1px 4px;border-radius:3px;color:#0f172a;word-break:break-all;}
+.content code{font-family:"Cascadia Code","Cascadia Mono",Consolas,"DejaVu Sans Mono",monospace;font-size:calc(var(--doc-size) * 0.857);background:#f1f5f9;padding:1px 4px;border-radius:3px;color:#0f172a;}
 .content pre{font-family:"Cascadia Code","Cascadia Mono",Consolas,"DejaVu Sans Mono",monospace;font-size:calc(var(--doc-size) * 0.81);background:#0f172a;color:#e2e8f0;padding:14px 16px;border-radius:8px;line-height:1.45;white-space:pre-wrap;word-break:break-word;}
 .content pre code{background:none;padding:0;color:inherit;}
 .content pre .cl{display:block;}   /* 코드 각 줄을 블록으로 → Paged.js 가 페이지 경계에서 줄 단위 분할(긴 코드블록 잘림 방지) */
@@ -583,7 +583,7 @@ body.landscape .cover{padding-top:40mm;}
 .content thead{display:table-header-group;}
 .content th{background:var(--brand);color:#fff;text-align:left;padding:6px 8px;font-size:calc(var(--doc-size) * 0.857);word-break:keep-all;overflow-wrap:break-word;}
 .content td{border:1px solid #e2e8f0;padding:6px 8px;vertical-align:top;word-break:keep-all;overflow-wrap:break-word;}
-.content td code,.content td a,.content th a{word-break:break-all;overflow-wrap:anywhere;}   /* 셀 안 긴 코드·URL(공백없는 토큰)은 끊어서 칸 넘침 방지(한글 keep-all 과 별개) */
+.content td code,.content td a,.content th a{overflow-wrap:anywhere;}   /* 셀 안 긴 코드·URL(공백없는 토큰)은 칸보다 길 때만 끊음 — break-all 은 식별자를 중간에서 쪼개므로 쓰지 않는다 */
 .content tbody tr:nth-child(even){background:#f8fafc;}
 .content blockquote{background:#eff6ff;background:color-mix(in srgb, var(--accent) 9%, #fff);border-left:4px solid var(--accent);padding:8px 12px;border-radius:4px;margin:12px 0;color:var(--brand);}
 .content blockquote p{margin:0;}
