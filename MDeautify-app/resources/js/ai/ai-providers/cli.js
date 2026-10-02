@@ -197,11 +197,11 @@
         var cmd=base+' -p --model '+model+(effort?' --effort '+effort:'')+(rid?' --resume '+rid:'')
                +' --system-prompt-file "'+sysPath+'" --disallowedTools Bash Edit Write NotebookEdit --output-format stream-json --include-partial-messages --verbose';
         var buf="",raw="",acc="",resultText="",proc=null,handler=null,done=false;
-        var lastUsage=null,lastModelUsage=null,lastRate=null,initModel="",sid="";
+        var lastUsage=null,lastModelUsage=null,lastRate=null,initModel="",sid="",isErr=false,errText="";
         function settle(code){
           if(done)return;done=true;
           if(handler){try{Neutralino.events.off("spawnedProcess",handler);}catch(e){}}
-          cb({code:code,acc:acc,resultText:resultText,raw:raw,sid:sid,usage:lastUsage,modelUsage:lastModelUsage,rate:lastRate,initModel:initModel});
+          cb({code:code,acc:acc,resultText:resultText,raw:raw,sid:sid,usage:lastUsage,modelUsage:lastModelUsage,rate:lastRate,initModel:initModel,isErr:isErr,errText:errText});
         }
         function handleLine(line){
           if(!line||!line.trim())return;
@@ -211,7 +211,9 @@
           if(o.type==="rate_limit_event"&&o.rate_limit_info){lastRate=o.rate_limit_info;return;}
           if(o.type==="stream_event"&&o.event&&o.event.type==="content_block_delta"&&o.event.delta&&o.event.delta.type==="text_delta"){acc+=o.event.delta.text;onDelta(o.event.delta.text);return;}
           if(o.type==="assistant"&&o.message&&o.message.usage)lastUsage=o.message.usage;   /* 보조: 스트림 중간 assistant 메시지 usage */
-          if(o.type==="result"){if(typeof o.result==="string")resultText=o.result;if(o.usage)lastUsage=o.usage;if(o.modelUsage&&Object.keys(o.modelUsage).length)lastModelUsage=o.modelUsage;}
+          if(o.type==="result"){if(typeof o.result==="string")resultText=o.result;if(o.usage)lastUsage=o.usage;if(o.modelUsage&&Object.keys(o.modelUsage).length)lastModelUsage=o.modelUsage;
+            /* 오류 결과(로그인 만료·한도·API 오류·이어가기 실패 등): 문구는 result 본문 또는 errors[] 에 온다 */
+            if(o.is_error||(o.subtype&&o.subtype!=="success")){isErr=true;errText=(typeof o.result==="string"&&o.result)||(Array.isArray(o.errors)?o.errors.join(" "):"")||"";}}
         }
         handler=function(evt){
           var d=evt.detail;if(!d||!proc||d.id!==proc.id)return;
@@ -250,17 +252,23 @@
         wrapUp(null);
       }
       function failed(r){return !r.acc&&!r.resultText;}
+      /* is_error 분류(v1.8.2 리팩터링에서 빠졌던 v1.8.1 동작 복원): 안 가르면 로그인 만료·사용 한도·API 오류 문구가
+         result 본문으로 와서 평범한 답변처럼 표시되고 대화 기록에도 남는다(로그인 안내 버튼도 안 뜸). */
+      function needLogin(r){return (failed(r)||r.isErr)&&loginErr(r.errText+"\n"+r.raw);}
       attempt(resumeId,function(r){
-        if(failed(r)&&loginErr(r.raw)){wrapUp(null,true);return;}
-        /* 이어가기 실패(세션 만료·정리됨) → 문서+대화 전체를 다시 싣고 딱 한 번 재시도 */
+        if(needLogin(r)){wrapUp(null,true);return;}
+        /* 이어가기 실패(세션 만료·정리됨) → 문서+대화 전체를 다시 싣고 딱 한 번 재시도.
+           실측(CLI 2.1.287): 없는 세션 --resume = 본문 없는 is_error 결과(errors[]="No conversation found…") + exit 1 → failed 로 잡힌다 */
         if(failed(r)&&resumeId&&String(r.code)!=="0"){
           attempt("",function(r2){
-            if(failed(r2)&&loginErr(r2.raw)){wrapUp(null,true);return;}
+            if(needLogin(r2)){wrapUp(null,true);return;}
+            if(r2.isErr){wrapUp(r2.errText||"CLI 오류");return;}
             if(failed(r2)&&String(r2.code)!=="0"){wrapUp("claude 실행 실패 (exit "+r2.code+") — CLI 설치/PATH·로그인 확인");return;}
             conclude(r2);
           });
           return;
         }
+        if(r.isErr){wrapUp(r.errText||"CLI 오류");return;}
         if(failed(r)&&String(r.code)!=="0"){wrapUp("claude 실행 실패 (exit "+r.code+") — CLI 설치/PATH·로그인 확인");return;}
         conclude(r);
       });
