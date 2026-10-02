@@ -664,6 +664,7 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
         await Neutralino.filesystem.writeFile(path,text);
         savedText=text;
         toast("저장됨");
+        if(window.__tabsOnEdit)window.__tabsOnEdit();   /* 기준선이 바뀌었으니 탭의 미저장 점 재계산(안 하면 다음 입력·탭 전환 때까지 점이 남음) */
       }catch(e){try{Neutralino.debug.log("[save] "+e);}catch(_){}if(window.__appAlert)window.__appAlert("저장 중 문제가 발생했습니다.","오류");else alert("저장 중 문제가 발생했습니다.");}
     }else{   /* 브라우저: 다운로드 */
       try{var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=defName;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);if(window.__appAlert)window.__appAlert("'"+defName+"' 파일을 다운로드했습니다.","다운로드 완료");else toast("다운로드됨");}catch(e){}
@@ -675,7 +676,7 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
     var isExe=(typeof window.NL_PORT!=="undefined"&&typeof window.Neutralino!=="undefined");
     if(!isExe||!window.__mdPath)return;              /* 브라우저 또는 경로 미확보 → 조용히 스킵 */
     var text=ta.value; if(text===savedText)return;   /* 변경 없음 → 쓰기 생략 */
-    try{await Neutralino.filesystem.writeFile(window.__mdPath,text);savedText=text;toast("자동 저장됨");}
+    try{await Neutralino.filesystem.writeFile(window.__mdPath,text);savedText=text;toast("자동 저장됨");if(window.__tabsOnEdit)window.__tabsOnEdit();}   /* 저장 후 탭 점 재계산 — 자동 저장은 입력 후에 일어나 이게 없으면 점이 항상 떠 있음 */
     catch(e){try{Neutralino.debug.log("[autosave] "+e);}catch(_){}}   /* 실패는 조용히 무시 */
   };
   document.addEventListener("keydown",function(e){

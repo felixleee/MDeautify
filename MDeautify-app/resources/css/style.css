@@ -211,6 +211,7 @@ body.explorer-collapsed #explorer{display:none;}
 .ex-empty-btn{font:inherit;font-size:12px;font-weight:700;border:1px solid var(--ui-brand-accent);border-radius:7px;padding:7px 16px;cursor:pointer;background:transparent;color:var(--ui-brand-accent);}
 .ex-empty-btn:hover{background:color-mix(in srgb,var(--ui-brand-accent) 14%,transparent);}
 #bar button#btnExplorer{display:inline-flex;align-items:center;justify-content:center;height:35px;padding:0 11px;}
+#bar button#btnExplorer[hidden]{display:none;}   /* id 규칙의 display 가 [hidden] 을 덮어 브라우저판(탐색기 비활성)에서도 버튼이 보이던 문제 */
 #bar button#btnExplorer svg{display:block;}
 #bar button#btnExplorer.on{background:color-mix(in srgb,var(--ui-brand-accent) 20%,transparent);}
 /* 설정 모달: 작업 폴더 관리 */
