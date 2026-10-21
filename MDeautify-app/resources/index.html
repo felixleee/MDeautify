@@ -86,6 +86,28 @@
               <label for='tmLandscape' title='켜면 A4 가로 방향으로 조판합니다. 미리보기·인쇄·PDF 내보내기에 모두 적용됩니다.'>가로 방향(A4 가로)</label>
               <input type='checkbox' id='tmLandscape' class='tm-switch'>
             </div>
+            <div class='tm-font tm-margin' role='group' aria-labelledby='tmMarginTitle'>
+              <div class='tm-margin-head'>
+                <span class='tm-margin-title' id='tmMarginTitle' title='미리보기·인쇄·PDF 내보내기에 모두 적용됩니다. 칸마다 10~40mm.'>여백</span>
+                <span class='tm-margin-state' id='tmMarginState'>단위 mm</span>
+              </div>
+              <div class='tm-seg' id='tmMarginPreset'>
+                <button type='button' data-preset='narrow' aria-pressed='false'>좁게</button>
+                <button type='button' data-preset='normal' aria-pressed='true'>보통</button>
+                <button type='button' data-preset='wide' aria-pressed='false'>넓게</button>
+              </div>
+              <div class='tm-mg-grid'>
+                <span></span>
+                <label>위 <input type='number' id='tmMarginT' min='10' max='40' step='1' value='18'></label>
+                <span></span>
+                <label>왼쪽 <input type='number' id='tmMarginL' min='10' max='40' step='1' value='15'></label>
+                <div class='tm-mg-page' aria-hidden='true'><div class='tm-mg-body' id='tmMarginBody'></div></div>
+                <label><input type='number' id='tmMarginR' min='10' max='40' step='1' value='15'> 오른쪽</label>
+                <span></span>
+                <label>아래 <input type='number' id='tmMarginB' min='10' max='40' step='1' value='18'></label>
+                <span></span>
+              </div>
+            </div>
             <div class='tm-font'>
               <label for='tmH2Break'>제목(H2)마다 새 페이지</label>
               <input type='checkbox' id='tmH2Break' class='tm-switch'>
@@ -311,6 +333,7 @@
       <script src="js/settings/font.js"></script>
       <script src="js/settings/size.js"></script>
       <script src="js/settings/orient.js"></script>
+      <script src="js/settings/margin.js"></script>
       <script src="js/settings/pagebreak.js"></script>
       <script src="js/settings/autosave.js"></script>
       <script src="js/settings/toc.js"></script>

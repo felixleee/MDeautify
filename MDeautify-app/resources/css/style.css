@@ -131,6 +131,25 @@ body{font-family:"Noto Sans KR","Noto Sans CJK KR","Noto Sans","Malgun Gothic","
 #tmFont:focus,#tmFooterAlign:focus,#tmFooterText:focus,#tmHeaderAlign:focus,#tmHeaderText:focus,#tmColor:focus{outline:none;border-color:var(--ui-brand-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--ui-brand-accent) 35%,transparent);}
 .tm-switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--tm-knob);transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.25);}
 .tm-switch:checked::after{left:20px;}
+/* 여백(설정 > 페이지): 프리셋 + 종이 도식 둘레의 4면 입력. 값·강조·도식 비율은 margin.js */
+.tm-font.tm-margin{display:block;}
+.tm-margin-head{display:flex;align-items:center;justify-content:space-between;}
+.tm-margin-title{font-size:12px;font-weight:700;color:var(--tm-fg2);}
+.tm-margin-state{font-size:11px;color:var(--tm-muted);}
+.tm-seg{display:flex;margin-top:8px;border:1px solid var(--tm-bhover);border-radius:6px;overflow:hidden;}
+.tm-seg button{flex:1 1 0;min-width:0;border:0;border-left:1px solid var(--tm-bhover);background:var(--tm-card);color:var(--tm-fg2);font:inherit;font-size:12px;font-weight:700;padding:5px 0;cursor:pointer;}
+.tm-seg button:first-child{border-left:0;}
+.tm-seg button:hover{background:var(--tm-hover-bg);}
+.tm-seg button[aria-pressed="true"]{background:color-mix(in srgb,var(--ui-brand-accent) 22%,var(--tm-card));color:var(--tm-fg);}
+.tm-seg button:focus-visible{outline:2px solid var(--ui-brand-accent);outline-offset:-2px;}
+.tm-mg-grid{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;justify-items:center;gap:6px;margin-top:10px;}
+.tm-margin .tm-mg-grid label{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:400;color:var(--tm-muted);white-space:nowrap;}
+.tm-mg-grid input{width:38px;box-sizing:border-box;padding:3px 6px;font:inherit;font-size:12px;text-align:right;border:1px solid var(--tm-bhover);border-radius:6px;background:var(--tm-card);color:var(--tm-fg);-moz-appearance:textfield;appearance:textfield;}
+.tm-mg-grid input::-webkit-inner-spin-button,.tm-mg-grid input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.tm-mg-grid input:focus{outline:none;border-color:var(--ui-brand-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--ui-brand-accent) 35%,transparent);}
+.tm-mg-page{position:relative;width:59px;height:83px;box-sizing:border-box;background:#fff;border:1px solid var(--tm-bhover);}   /* 종이는 다크에서도 흰색 */
+body.landscape .tm-mg-page{width:83px;height:59px;}
+.tm-mg-body{position:absolute;box-sizing:border-box;padding:2px;border:1px dashed var(--ui-brand-accent);background:repeating-linear-gradient(to bottom,#d5dbe3 0 1.5px,transparent 1.5px 4px) content-box;}
 /* 다크 모드 토글: 손잡이에 상태 아이콘(라이트=해 / 다크=달). #tmDark 에만 적용 */
 #tmDark::after{content:"\2600";display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;color:#f59e0b;}
 #tmDark:checked::after{content:"\1F319";}
@@ -533,13 +552,12 @@ select:focus{outline:none;box-shadow:0 0 0 3px color-mix(in srgb, var(--ui-brand
 #raw .mh{color:var(--sx-h);} #raw .mq{color:var(--sx-q);} #raw .ml{color:var(--sx-l);} #raw .mc{color:var(--sx-c);} #raw .mb{color:var(--sx-b);} #raw .mlk{color:var(--sx-lk);}
 .pv-head{flex:0 0 auto;background:var(--ui-pvhead-bg);color:var(--ui-pvhead-fg);text-align:center;padding:8px 0;font-size:12px;border-bottom:1px solid var(--ui-pvhead-border);}
 #pages{padding:24px 12px;}
-#pages .paper{width:210mm;box-sizing:border-box;background:#fff;margin:0 auto;padding:18mm 15mm;box-shadow:0 3px 14px rgba(0,0,0,.28);}
-/* 가로 방향 — 페이지 크기 자체는 pageSizeCss(orient.js), 여기선 선택자로 묶이는 것만.
-   이미지 상한은 본문 높이 기준: 세로 261mm→250mm, 가로 174mm→165mm(안 줄이면 페이지를 넘김).
-   표지 여백도 본문 높이에 비례(60/261 ≈ 40/174). */
-body.landscape #pages .paper,body.landscape #pages .fallback-doc{width:297mm;}
-body.landscape .content img,body.landscape .content figure img{max-height:165mm;}
-body.landscape .cover{padding-top:40mm;}
+/* 종이 치수·여백 — 여기는 기본값이고 orient.js(--pg-w/--pg-h)·margin.js(--pg-m*)가 :root 인라인으로 덮어쓴다.
+   페이지 크기 자체는 pageSizeCss(orient.js), Paged.js 여백은 pagedCss()(app.js)가 숫자로 따로 넘긴다.
+   본문 높이(--pg-body-h) 기준: 이미지 상한 = 본문 − 11mm(안 줄이면 페이지를 넘김), 표지 위 여백 = 본문 × 60/261.
+   기본 여백이면 세로 250mm·60mm, 가로 163mm·40mm. 내보내기는 :root 인라인 스타일을 그대로 옮기므로 PDF 도 같다. */
+:root{--pg-w:210mm;--pg-h:297mm;--pg-mt:18mm;--pg-mr:15mm;--pg-mb:18mm;--pg-ml:15mm;--pg-body-h:calc(var(--pg-h) - var(--pg-mt) - var(--pg-mb));}
+#pages .paper{width:var(--pg-w);box-sizing:border-box;background:#fff;margin:0 auto;padding:var(--pg-mt) var(--pg-mr) var(--pg-mb) var(--pg-ml);box-shadow:0 3px 14px rgba(0,0,0,.28);}
 #pages .pagedjs_page{background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.3);margin:0 auto 34px !important;}
 #pages .pagedjs_pages{display:block;}
 /* 페이지 상단 시작 위치 일정하게: 각 페이지 첫 요소 margin-top 제거 */
@@ -548,12 +566,12 @@ body.landscape .cover{padding-top:40mm;}
 .pagedjs_page_content .content > *:first-child{margin-top:0 !important;}
 #src{display:none;}
 /* fallback continuous view */
-#pages .fallback-doc{width:210mm;background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.28);padding:18mm 15mm;}
+#pages .fallback-doc{width:var(--pg-w);background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.28);padding:var(--pg-mt) var(--pg-mr) var(--pg-mb) var(--pg-ml);}
 #pages .pagedjs_margin-bottom-center .pagedjs_margin-content{display:flex;align-items:center;justify-content:center;font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}
 #pages .pagedjs_margin-top-center .pagedjs_margin-content{display:flex;align-items:center;justify-content:center;font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}
 #pages .pagedjs_margin-bottom-center>.pagedjs_margin-content::before,#pages .pagedjs_margin-bottom-center>.pagedjs_margin-content::after{content:none !important;}
 /* ---- document theme (applies to paged pages / fallback) ---- */
-.cover{text-align:center;padding-top:60mm;}
+.cover{text-align:center;padding-top:calc(var(--pg-body-h) * 60 / 261);}
 .cover .kicker{color:var(--accent);font-weight:bold;letter-spacing:2px;font-size:11pt;}
 .cover h1{font-size:26pt;margin:14px 0 6px;color:var(--brand);}
 .cover .st{color:#64748b;font-size:12pt;margin-bottom:30px;}
@@ -589,10 +607,10 @@ body.landscape .cover{padding-top:40mm;}
 .content blockquote{background:#eff6ff;background:color-mix(in srgb, var(--accent) 9%, #fff);border-left:4px solid var(--accent);padding:8px 12px;border-radius:4px;margin:12px 0;color:var(--brand);}
 .content blockquote p{margin:0;}
 .content figure{margin:14px 0;text-align:center;} .content figure svg{max-width:100%;height:auto;}
-.content figure img{max-width:100%;max-height:250mm;}
+.content figure img{max-width:100%;max-height:calc(var(--pg-body-h) - 11mm);}
 .content figure figcaption{font-size:calc(var(--doc-size) * 0.82);color:#64748b;margin-top:6px;}
-/* 이미지: 페이지 폭·높이 넘침 방지(세로로 긴 이미지가 페이지보다 커서 잘리는 것 방지 — 본문영역 261mm 안으로 축소) */
-.content img{max-width:100%;max-height:250mm;display:block;margin:12px auto;border-radius:4px;}
+/* 이미지: 페이지 폭·높이 넘침 방지(세로로 긴 이미지가 페이지보다 커서 잘리는 것 방지 — 본문 높이(--pg-body-h) 안으로 축소) */
+.content img{max-width:100%;max-height:calc(var(--pg-body-h) - 11mm);display:block;margin:12px auto;border-radius:4px;}
 /* h5, h6 (기존 h4 이하 스케일 이어서) */
 .content h5{font-size:calc(var(--doc-size) * 1.0);color:#334155;font-weight:700;margin:10px 0 5px;}
 .content h6{font-size:calc(var(--doc-size) * 0.95);color:#64748b;font-weight:700;margin:10px 0 5px;}
@@ -629,7 +647,7 @@ body.landscape .cover{padding-top:40mm;}
 /* 페이지 크기는 orient.js 가 <style id="pageSizeCss"> 로 단독 관리 — 여기선 여백만 */
 @page{margin:0;}
 @media print{
-  /* PAGED_CSS에서 새어 나온 @page{margin:18mm 15mm} 무력화 — 물리 여백 0, 여백은 페이지 박스에 이미 포함 */
+  /* PAGED_CSS(pagedCss)에서 새어 나온 @page 여백 무력화 — 물리 여백 0, 여백은 페이지 박스에 이미 포함 */
   @page{margin:0 !important;}
   html,body{height:auto;overflow:visible;display:block;background:#fff;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
   #bar,#explorer,#exResizer,#editor,#drop,#themeModal,#settingsModal,#notesModal,#updModal,#splitter{display:none !important;}

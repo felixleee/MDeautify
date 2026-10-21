@@ -2,7 +2,8 @@
    @page 는 선택자로 묶을 수 없어 <style id="pageSizeCss"> 를 직접 갈아끼운다 — style.css 의 @page 두 곳은
    size 를 빼고 margin 만 남겼으므로 여기가 화면·인쇄 페이지 크기의 유일한 출처.
    Paged.js 는 pagedCss()(app.js)가 넘기는 @page 를 따로 읽고, 내보내기는 export-pdf.js 가 직접 싣는다.
-   .paper 폭·이미지 상한·표지 여백처럼 선택자로 묶이는 것은 body.landscape 로 처리. */
+   종이 폭·높이는 :root 의 --pg-w/--pg-h 로도 건다 — .paper 폭·이미지 상한·표지 여백이 여백(margin.js)과
+   함께 이 값으로 계산된다(style.css 의 --pg-body-h). */
 (function(){
   var KEY="md2pdf_page_orient";
   var cb=document.getElementById("tmLandscape");
@@ -15,6 +16,8 @@
     var land=(window.__pageOrient==="landscape");
     document.body.classList.toggle("landscape",land);
     styleEl().textContent="@page{size:A4 "+(land?"landscape":"portrait")+";}";
+    document.documentElement.style.setProperty("--pg-w",land?"297mm":"210mm");
+    document.documentElement.style.setProperty("--pg-h",land?"210mm":"297mm");
     if(cb)cb.checked=land;
   }
   function load(){

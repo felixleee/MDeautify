@@ -30,9 +30,11 @@ return "<div class='cover'>"+(kicker?"<div class='kicker'>"+esc(kicker)+"</div>"
 
 /* 페이지 방향(orient.js 가 window.__pageOrient 설정). 세로 297mm / 가로 210mm 높이. */
 function pageH(){return window.__pageOrient==="landscape"?210:297;}
-/* Paged.js 에 넘길 CSS — @page 의 size 에 방향을 끼워 넣는다 */
-function pagedCss(){return PAGED_CSS.replace("size:A4;","size:A4 "+(window.__pageOrient==="landscape"?"landscape":"portrait")+";");}
-var PAGED_CSS="@page{size:A4;margin:18mm 15mm;@bottom-center{content:counter(page);font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}@top-center{content:' ';font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}}.content h1,.content h2,.content h3,.content h4{break-after:avoid-page;-webkit-column-break-after:avoid;}.content tr,.content img,.content svg,.content figure{break-inside:avoid;}.content table,.content ul,.content ol,.content pre,.content blockquote{break-inside:auto;}.content thead{break-after:avoid;}.pb-before{break-before:page;}.cover{break-after:page;}.toc{break-after:page;}.content p,.content li{orphans:2;widows:2;}";
+/* 페이지 여백(margin.js 가 window.__pageMargin 설정, mm). 없으면 기본 위아래 18 · 좌우 15. */
+function pageM(){return window.__pageMargin||{t:18,r:15,b:18,l:15};}
+/* Paged.js 에 넘길 CSS — @page 머리에 크기(방향)와 여백을 숫자로 끼워 넣는다 */
+function pagedCss(){var m=pageM();return PAGED_CSS.replace("@page{","@page{size:A4 "+(window.__pageOrient==="landscape"?"landscape":"portrait")+";margin:"+m.t+"mm "+m.r+"mm "+m.b+"mm "+m.l+"mm;");}
+var PAGED_CSS="@page{@bottom-center{content:counter(page);font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}@top-center{content:' ';font-family:'Noto Sans KR','Malgun Gothic',sans-serif;font-size:9pt;color:#94a3b8;}}.content h1,.content h2,.content h3,.content h4{break-after:avoid-page;-webkit-column-break-after:avoid;}.content tr,.content img,.content svg,.content figure{break-inside:avoid;}.content table,.content ul,.content ol,.content pre,.content blockquote{break-inside:auto;}.content thead{break-after:avoid;}.pb-before{break-before:page;}.cover{break-after:page;}.toc{break-after:page;}.content p,.content li{orphans:2;widows:2;}";
 
 /* 경량 구문 강조기: 주석/문자열/숫자/키워드/함수명 토큰만 span으로 감쌈(정식 파서 아님, 다국어 공통) */
 /* 경량 다국어 구문 강조기(정식 파서 아님). 언어 지정(```lang) 블록에만 적용. 지원: js,ts,c,cpp,cs,php,python,bash,powershell,sql,json / html,css,scss,markdown */
@@ -267,9 +269,9 @@ function applyWidowHeadingBreaks(src){
     if(!box)continue;
     var br=box.getBoundingClientRect(),hr=h.getBoundingClientRect();
     if(br.height<=0)continue;
-    var ph=pageH();                                      // 페이지 높이(mm) — 방향에 따라 297 또는 210
-    var contentBottom=br.bottom - br.height*(18/ph);     // 아래 여백 18mm
-    var contentH=br.height*((ph-36)/ph);                 // 본문 영역 높이(위아래 18mm 제외)
+    var ph=pageH(),pm=pageM();                           // 페이지 높이(mm) — 방향에 따라 297 또는 210 · 여백(mm)
+    var contentBottom=br.bottom - br.height*(pm.b/ph);   // 아래 여백
+    var contentH=br.height*((ph-pm.t-pm.b)/ph);          // 본문 영역 높이(위아래 여백 제외)
     var remaining=contentBottom - hr.top;                // space from heading top to content bottom
     if(remaining>0 && remaining < contentH*0.35){
       if(sh[i] && !sh[i].classList.contains("pb-before")){sh[i].classList.add("pb-before");changed=true;}
@@ -281,7 +283,7 @@ function paginate(src){
 var pages=document.getElementById("pages");pages.innerHTML="";
 var paper=document.createElement("div");paper.className="paper";paper.innerHTML=src.innerHTML;pages.appendChild(paper);
 var head=document.getElementById("pvHead");
-try{var r=document.createElement("div");r.style.cssText="position:absolute;left:-9999px;width:100mm;height:10mm;";document.body.appendChild(r);var pxmm=r.offsetWidth/100;document.body.removeChild(r);var pc=(pageH()-36)*pxmm;var n=(pc>0&&paper.scrollHeight>0)?Math.max(1,Math.ceil(paper.scrollHeight/pc)):0;if(head)head.textContent=n?("미리보기 · 약 "+n+"페이지 (저장/인쇄 시 자동 페이지 분할)"):"미리보기 (저장/인쇄 시 자동 페이지 분할)";}catch(e){if(head)head.textContent="미리보기";}
+try{var r=document.createElement("div");r.style.cssText="position:absolute;left:-9999px;width:100mm;height:10mm;";document.body.appendChild(r);var pxmm=r.offsetWidth/100;document.body.removeChild(r);var pm=pageM(),pc=(pageH()-pm.t-pm.b)*pxmm;var n=(pc>0&&paper.scrollHeight>0)?Math.max(1,Math.ceil(paper.scrollHeight/pc)):0;if(head)head.textContent=n?("미리보기 · 약 "+n+"페이지 (저장/인쇄 시 자동 페이지 분할)"):"미리보기 (저장/인쇄 시 자동 페이지 분할)";}catch(e){if(head)head.textContent="미리보기";}
 document.getElementById("viewer").scrollTop=0;
 }
 function runPaged(src,keepScroll,attempt){
