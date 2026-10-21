@@ -9,7 +9,7 @@
   if(cb)cb.addEventListener("change",function(){
     window.__h2NewPage=cb.checked;
     MD2R.save(KEY,cb.checked?"1":"0");
-    if(window.__lastText&&typeof renderMarkdown==="function")renderMarkdown(window.__lastText);
+    if(window.__reflowPreview)window.__reflowPreview();   /* 미리보기만 다시 조판(편집기·저장 기준선은 그대로) */
   });
   MD2R.register(function(){if(cb)MD2R.save(KEY,cb.checked?"1":"0");},[KEY]);
 })();

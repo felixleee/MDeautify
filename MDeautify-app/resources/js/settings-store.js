@@ -83,9 +83,13 @@
   }
 
   /* 닫힐 때(X·Alt+F4) 창 상태를 마지막으로 저장하고 종료 (config exitProcessOnClose:false 라 직접 종료).
-     이동은 실시간 이벤트가 없어 이 시점 저장으로 '옮기고 바로 닫기'까지 반영. 무엇이 막혀도 800ms 내 강제 종료. */
+     이동은 실시간 이벤트가 없어 이 시점 저장으로 '옮기고 바로 닫기'까지 반영. 무엇이 막혀도 800ms 내 강제 종료.
+     저장 안 한 문서가 있으면 먼저 묻는다(tabs.js __confirmExit) — 강제 종료 타이머는 확인이 끝난 뒤에 건다. */
+  var closing=false;
   try{
     Neutralino.events.on("windowClose",async function(){
+      if(closing)return;closing=true;   /* 확인창이 떠 있는 동안 X 를 또 눌러도 한 번만 */
+      try{if(window.__confirmExit&&!(await window.__confirmExit())){closing=false;return;}}catch(e){}   /* 취소·저장 실패 → 창 유지 */
       var killer=setTimeout(function(){try{Neutralino.app.exit();}catch(e){}},800);
       try{ if(morphed){ await saveWin(); await doSave(); } }catch(e){}   /* 변신 후에만 저장(스플래시 크기는 저장 안 함) */
       clearTimeout(killer);

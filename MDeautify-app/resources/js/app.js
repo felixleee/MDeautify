@@ -244,20 +244,47 @@ function setHead(txt){var h=document.getElementById("pvHead");if(h)h.textContent
 function fallbackRender(src){var pages=document.getElementById("pages");pages.innerHTML="";
 var d=document.createElement("div");d.className="fallback-doc";d.innerHTML=src.innerHTML;pages.appendChild(d);
 setHead("연속 보기 (페이지 분할 미리보기를 사용할 수 없습니다)");}
-function repeatTableHeaders(container){
-  var last=null;
-  container.querySelectorAll(".pagedjs_page table").forEach(function(t){
-    var thead=t.querySelector(":scope > thead");
-    var colg=t.querySelector(":scope > colgroup");
-    if(thead){last={thead:thead,colg:colg};return;}
-    if(last){
-      if(last.colg && !colg){t.insertBefore(last.colg.cloneNode(true),t.firstChild);}
-      var tb=t.querySelector(":scope > tbody");
-      var h=last.thead.cloneNode(true);
-      if(tb){t.insertBefore(h,tb);}else{t.appendChild(h);}
+/* 표가 페이지를 넘으면 이어지는 쪽 맨 위에 머리글(thead)·열 폭(colgroup)을 다시 붙인다 — Paged.js 핸들러로 '조판 중에'.
+   예전엔 조판이 끝난 뒤 thead 를 끼워 넣어 그 높이만큼 쪽 아래가 넘쳤고(마지막 행·표 뒤 문단이 PDF 에서 사라짐),
+   앞 표 머리글을 '다음 표'에 붙여 머리글 없는 다른 표(결재란 등)에도 엉뚱한 머리글이 붙었다.
+   흐름: afterPageLayout 에서 이 쪽 끝에서 쪼개진 표(원본 data-ref)를 기억 → 다음 쪽 layout 훅(넘침 검사 직전)에서
+   그 표의 이어지는 조각(data-split-from)에 원본 thead 복제를 넣는다 → 머리글 높이까지 계산돼 남는 행은 다음 쪽으로 간다. */
+(function(){
+  var PM=window.PagedModule;if(!PM||!PM.Handler||!PM.registerHandlers)return;
+  function q(v){return (window.CSS&&CSS.escape)?CSS.escape(v):String(v).replace(/["\\]/g,"\\$&");}
+  class RepeatTableHeaders extends PM.Handler{
+    constructor(chunker,polisher,caller){super(chunker,polisher,caller);this.refs=[];}
+    afterPageLayout(pageEl,page,breakToken,chunker){
+      this.chunker=chunker;this.refs=[];
+      var el=breakToken&&breakToken.node;if(!el)return;
+      if(el.nodeType!==1)el=el.parentElement;
+      if(el&&el.closest&&el.closest("thead"))return;   /* 머리글 한가운데서 끊김(머리글이 한 쪽보다 큼) → 반복 없이 나머지를 그대로 잇는다 */
+      for(;el;el=el.parentElement){
+        if(el.tagName!=="TABLE")continue;
+        var ref=el.getAttribute("data-ref");if(!ref)continue;
+        this.refs.push(ref);
+        /* 이 쪽엔 머리글만 들어가고 행이 하나도 못 들어갔으면 그 머리글은 숨긴다(다음 쪽에서 머리글+행으로 시작) */
+        var here=pageEl.querySelector('table[data-ref="'+q(ref)+'"]');
+        if(here&&!here.querySelector("tr:not(thead tr)")){here.style.visibility="hidden";here.style.position="absolute";}
+      }
     }
-  });
-}
+    layout(rendered){
+      if(!this.refs.length||!this.chunker||!this.chunker.source)return;
+      for(var i=0;i<this.refs.length;i++){
+        var ref=q(this.refs[i]);
+        var t=rendered.querySelector('table[data-ref="'+ref+'"][data-split-from]');
+        if(!t||t.hasAttribute("data-thead-repeat"))continue;   /* layout 훅은 한 쪽에서 여러 번 불린다 → 한 번만 */
+        var src=this.chunker.source.querySelector('table[data-ref="'+ref+'"]');
+        var head=src&&src.querySelector(":scope > thead");if(!head)continue;   /* 원본에 머리글이 없는 표는 그대로 */
+        var body=t.querySelector(":scope > tbody, :scope > tr, :scope > tfoot");
+        if(!t.querySelector(":scope > colgroup"))src.querySelectorAll(":scope > colgroup").forEach(function(c){t.insertBefore(c.cloneNode(true),body);});
+        t.insertBefore(head.cloneNode(true),body);
+        t.setAttribute("data-thead-repeat","");
+      }
+    }
+  }
+  PM.registerHandlers(RepeatTableHeaders);
+})();
 function applyWidowHeadingBreaks(src){
   var pages=document.getElementById("pages");
   var rh=pages.querySelectorAll(".pagedjs_page_content h2,.pagedjs_page_content h3,.pagedjs_page_content h4");
@@ -286,9 +313,16 @@ var head=document.getElementById("pvHead");
 try{var r=document.createElement("div");r.style.cssText="position:absolute;left:-9999px;width:100mm;height:10mm;";document.body.appendChild(r);var pxmm=r.offsetWidth/100;document.body.removeChild(r);var pm=pageM(),pc=(pageH()-pm.t-pm.b)*pxmm;var n=(pc>0&&paper.scrollHeight>0)?Math.max(1,Math.ceil(paper.scrollHeight/pc)):0;if(head)head.textContent=n?("미리보기 · 약 "+n+"페이지 (저장/인쇄 시 자동 페이지 분할)"):"미리보기 (저장/인쇄 시 자동 페이지 분할)";}catch(e){if(head)head.textContent="미리보기";}
 document.getElementById("viewer").scrollTop=0;
 }
+/* 조판 완료 대기: 세대(__pgGen)마다 끝나면 pgSettle(세대). 더 새 조판이 이전 것을 대신하므로 'gen 이하가 끝남'을 기다리면 된다.
+   내보내기·인쇄가 진행 중인 조판이 끝난 DOM 을 쓰게 한다(window.__whenPaged). */
+var pgWait=[];
+function pgSettle(gen){window.__pgDoneGen=gen;for(var i=pgWait.length-1;i>=0;i--){if(pgWait[i].g<=gen){pgWait[i].r();pgWait.splice(i,1);}}}
+function pgUntil(gen){return (window.__pgDoneGen||0)>=gen?Promise.resolve():new Promise(function(r){pgWait.push({g:gen,r:r});});}
+window.__whenPaged=function(){return pgUntil(window.__pgGen||0);};
 function runPaged(src,keepScroll,attempt){
   attempt=attempt||0;
   var myGen=(window.__pgGen=(window.__pgGen||0)+1);   /* 이 조판의 세대 번호. 더 새 조판이 시작되면 이 결과는 폐기(탭 전환·연속 편집 경쟁 방지) */
+  var done=pgUntil(myGen);   /* 이 조판(또는 이를 대신한 더 새 조판)이 끝나면 resolve */
   var pages=document.getElementById("pages");
   var viewer=document.getElementById("viewer");
   var vMax=viewer.scrollHeight-viewer.clientHeight;
@@ -312,7 +346,7 @@ function runPaged(src,keepScroll,attempt){
     }
     var m=viewer.scrollHeight-viewer.clientHeight;viewer.scrollTop=keepScroll?ratio*m:0;   /* 폴백: 앵커 블록 못 찾으면 비율 */
   }
-  if(!window.PagedModule||!window.PagedModule.Previewer){pages.innerHTML="";fallbackRender(src);restore();return;}
+  if(!window.PagedModule||!window.PagedModule.Previewer){pages.innerHTML="";fallbackRender(src);restore();pgSettle(myGen);return done;}
   var blobUrl=null;try{blobUrl=URL.createObjectURL(new Blob([pagedCss()],{type:"text/css"}));}catch(e){}
   /* 새 조판은 화면 밖 임시 컨테이너에서 완료한 뒤 한 번에 교체 → 편집 중 '기존 내용이 비었다가 다시 채워지는' 깜빡임 제거.
      교체 전까지 기존 미리보기가 그대로 보이고, 완료 순간 새 내용+스크롤 복원이 같은 프레임에 반영됨.
@@ -322,7 +356,7 @@ function runPaged(src,keepScroll,attempt){
   document.body.appendChild(staging);
   function dropStaging(){if(staging&&staging.parentNode)staging.parentNode.removeChild(staging);staging=null;}
   function swapIn(){pages.innerHTML="";while(staging.firstChild)pages.appendChild(staging.firstChild);dropStaging();}
-  function fail(err){if(myGen!==window.__pgGen){dropStaging();return;}if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();}
+  function fail(err){if(myGen!==window.__pgGen){dropStaging();return;}if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();pgSettle(myGen);}
   /* 콘텐츠 맨 앞에 <style> 태그를 붙이면 Paged.js 가 첫 페이지를 복제하는 버그가 있다(표지 없는 문서에서 발현).
      → PAGED_CSS 는 스타일시트(blobUrl)로만 넘기고, blob 생성 실패 시에만 인라인 <style> 폴백. */
   var content=blobUrl?src.innerHTML:("<style>"+pagedCss()+"</style>"+src.innerHTML);
@@ -335,16 +369,17 @@ function runPaged(src,keepScroll,attempt){
       var bad=false,pcs=staging.querySelectorAll(".pagedjs_page_content");
       for(var bi=0;bi<pcs.length;bi++){if(pcs[bi].scrollWidth>pcs[bi].clientWidth+4){bad=true;break;}}
       if(bad&&attempt<2){dropStaging();setTimeout(function(){if(myGen===window.__pgGen)runPaged(src,keepScroll,attempt+1);},50);return;}   /* 한 박자 쉬고 재조판(레이아웃 안정 후) */
-      swapIn();
-      repeatTableHeaders(pages);
+      swapIn();   /* 표 머리글 반복은 조판 중에 RepeatTableHeaders 핸들러가 이미 넣었다 */
       if(typeof applyFooter==="function")applyFooter();
       if(typeof applyHeader==="function")applyHeader();
       if(typeof fillToc==="function")fillToc();
       var n=pages.querySelectorAll(".pagedjs_page").length||((flow&&flow.total)||0);
       setHead("Total "+n+" page"+(n>1?"s":""));
       restore();
+      pgSettle(myGen);
     }).catch(fail);
   }catch(e){fail(e);}
+  return done;
 }
 /* 미리보기만 재생성(에디터 내용은 건드리지 않음). keepScroll=true면 뷰어 스크롤 위치 유지(편집 중 튐 방지) */
 async function renderPreview(text,keepScroll){
@@ -354,7 +389,7 @@ document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayou
 if(!keepScroll)setHead("페이지 분할 중...");   /* 편집 재렌더 땐 기존 'Total N' 유지 → 헤더 깜빡임 방지(내용은 화면 밖에서 조판 후 교체) */
 /* EXE(Neutralino)에서 로컬 이미지 경로(![](example.png))를 .md 폴더 기준으로 읽어 data URI로 치환. 브라우저에선 훅 없음. */
 if(typeof window.__resolveLocalImages==="function"){try{await window.__resolveLocalImages(src);}catch(e){}}
-runPaged(src,keepScroll);
+return runPaged(src,keepScroll);   /* 조판이 끝나면 resolve */
 }
 /* 파일 로드 등: 에디터(textarea+미러)에 내용을 채우고 미리보기도 처음부터 생성 */
 function renderMarkdown(text){
@@ -362,8 +397,16 @@ if(text!=null)text=String(text).replace(/\r\n?/g,"\n");   /* 편집기 진입 �
 var ta=document.getElementById("rawInput");if(ta){ta.value=text;ta.scrollTop=0;}
 if(window.__markClean)window.__markClean();   /* 새 문서 로드 = 저장 기준선 리셋(변경감지 초기화) */
 var mirror=document.getElementById("raw");if(mirror){mirror.innerHTML=hlMd(text);mirror.scrollTop=0;}
+if(window.__findRefresh)window.__findRefresh();   /* 열린 찾기 바의 결과를 새 내용 기준으로(이전 문서 오프셋으로 바꾸지 않게) */
 renderPreview(text,false);
 }
+/* 설정 변경(여백·방향·글자 크기·글꼴·목차·H2 새 페이지) → 미리보기만 다시 조판.
+   ⚠️renderMarkdown 은 '문서 열기'용(편집기 값·저장 기준선·스크롤 초기화)이라 여기 쓰면 방금 친 글자와 미저장 표시(●)가 날아간다. */
+window.__reflowPreview=function(){
+  if(!document.body.classList.contains("loaded"))return;   /* 열린 문서 없음(탭 모두 닫음) → 닫은 문서를 되살리지 않게 */
+  var ta=document.getElementById("rawInput");
+  return renderPreview(ta?ta.value:(window.__lastText||""),true);
+};
 /* 공용 토스트: md 뷰어(#viewer) 우상단(스티키 헤더 아래)에 표시. position:fixed 라 부모 무관 → 위치를 뷰어 기준으로 계산.
    여러 곳(저장·이미지·복구·탐색기)이 같은 #fbToast 를 공유하되 항상 뷰어에 앵커되게 통일. */
 window.__toast=function(msg,dur){
@@ -529,10 +572,16 @@ window.MD2R=(function(){var K="md2pdf_remember",regs=[];function on(){try{var v=
 })();
 
 function __needDoc(){if(!document.body.classList.contains("loaded")){if(window.__appAlert)window.__appAlert("먼저 MD 파일을 불러오세요.","변환할 내용이 없어요");else alert("변환된 내용이 없습니다. 먼저 MD 파일을 불러오세요.");return false;}return true;}
+/* 내보내기·인쇄 직전: 대기 중인 입력(2초 디바운스)을 반영하고 진행 중인 조판이 끝날 때까지 기다린다(최대 15초).
+   안 그러면 고치고 2초 안에 누른 PDF·인쇄에 고치기 전 미리보기가 찍힌다. */
+window.__readyToPrint=async function(){
+  var wait=(async function(){if(window.__flushEdit)await window.__flushEdit(true);if(window.__whenPaged)await window.__whenPaged();})();
+  await Promise.race([wait,new Promise(function(r){setTimeout(r,15000);})]);
+};
 /* 'PDF 저장' = 원클릭 내보내기(헤드리스 인쇄), 없으면 인쇄 대화상자 폴백 */
-document.getElementById("btnPrint").addEventListener("click",function(){if(!__needDoc())return;if(window.__exportPdf){window.__exportPdf();}else{window.print();}});
+document.getElementById("btnPrint").addEventListener("click",function(){if(!__needDoc())return;if(window.__exportPdf){window.__exportPdf();}else{window.__readyToPrint().then(function(){window.print();});}});
 /* '인쇄' = 항상 기존 인쇄 대화상자(실제 프린터 / 대상에서 'PDF로 저장' 선택 가능) */
-var _btnPrintDlg=document.getElementById("btnPrintDlg");if(_btnPrintDlg)_btnPrintDlg.addEventListener("click",function(){if(!__needDoc())return;window.print();});
+var _btnPrintDlg=document.getElementById("btnPrintDlg");if(_btnPrintDlg)_btnPrintDlg.addEventListener("click",function(){if(!__needDoc())return;window.__readyToPrint().then(function(){window.print();});});
 /* 상단 'MD 파일 열기' — 파일 선택 창을 열어 다른 MD 파일 불러오기 */
 var _btnOpenTop=document.getElementById("btnOpenTop");if(_btnOpenTop)_btnOpenTop.addEventListener("click",function(){if(window.__nativeOpen){window.__nativeOpen();return;}var fi=document.getElementById("fileInput");if(fi){fi.value="";fi.click();}});
 /* 목차 등 내부 앵커 링크(#슬러그) 클릭 → 뷰어(#pages) 안에서 해당 heading 으로 부드럽게 스크롤(스티키 헤더 높이만큼 보정). */
@@ -622,7 +671,29 @@ setIco();})();
 /* 편집 중엔 왼쪽 미러(색상 강조)만 즉시 갱신하고, 무거운 미리보기 재생성은 입력을 멈춘 뒤 3초 후 1회만 실행
    → 타이핑 중 오른쪽 미리보기가 자주 재분할되며 깜빡이던 문제 방지. */
 var EDIT_DELAY=2000;
-ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;if(window.__tabsOnEdit)window.__tabsOnEdit();clearTimeout(t);t=setTimeout(function(){renderPreview(ta.value,true);if(window.__autoSave&&window.__autoSaveMd)window.__autoSaveMd();},EDIT_DELAY);});
+function settle(){t=null;renderPreview(ta.value,true);if(window.__autoSave&&window.__autoSaveMd)window.__autoSaveMd();}
+ta.addEventListener("input",function(){mirror.innerHTML=hlMd(ta.value);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;if(window.__tabsOnEdit)window.__tabsOnEdit();clearTimeout(t);t=setTimeout(settle,EDIT_DELAY);});
+/* 대기 중인 입력(위 디바운스)을 지금 처리. 타이머가 문서와 묶여 있지 않아 그냥 두면 2초 뒤 '그때 열린 문서'를 조판·자동 저장하고,
+   마지막 탭을 닫은 빈 화면도 되살린다 → 탭 전환·닫기·내보내기·이미지 삽입 전에 부른다(await).
+   render=true 면 지금 내용으로 조판까지 끝낸 뒤 resolve. 대기 중인 입력이 없으면 아무것도 안 함. */
+window.__flushEdit=async function(render){
+  if(t==null)return;
+  clearTimeout(t);t=null;
+  if(render)await renderPreview(ta.value,true);
+  if(window.__autoSave&&window.__autoSaveMd)await window.__autoSaveMd();
+};
+window.__cancelEdit=function(){clearTimeout(t);t=null;};   /* 저장 없이 타이머만 취소(새 문서 열기 직전 — 이전 문서 내용은 탭 스냅샷에 남는다) */
+/* 코드로 편집기 내용을 바꿀 때(이미지 삽입·참조 삭제): ta.value= 로 통째 바꾸면 실행취소 기록이 끊기고 input 이 안 나서
+   ●·자동 저장·찾기·미러가 안 따라온다 → 바뀐 구간만 골라 execCommand 로 교체(사용자 입력과 같은 길). */
+window.__applyEdit=function(nt){
+  var ot=ta.value;if(ot===nt)return;
+  var a=0,n=Math.min(ot.length,nt.length);while(a<n&&ot.charCodeAt(a)===nt.charCodeAt(a))a++;
+  var b=0;while(b<ot.length-a&&b<nt.length-a&&ot.charCodeAt(ot.length-1-b)===nt.charCodeAt(nt.length-1-b))b++;
+  var ins=nt.slice(a,nt.length-b),ok=false;
+  ta.focus();ta.setSelectionRange(a,ot.length-b);
+  try{ok=document.execCommand(ins?"insertText":"delete",false,ins);}catch(e){}
+  if(!ok||ta.value!==nt){ta.value=nt;ta.selectionStart=ta.selectionEnd=a+ins.length;ta.dispatchEvent(new Event("input",{bubbles:true}));}   /* execCommand 불가 환경 폴백 */
+};
 function syncMirror(){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
 ta.addEventListener("scroll",syncMirror);
 /* 커서 이동(방향키·클릭·타이핑)으로 textarea 가 자동 스크롤될 때 'scroll' 이벤트가 누락되는 엔진이 있어
@@ -638,47 +709,59 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
 (function(){
   var ta=document.getElementById("rawInput");if(!ta)return;
   var savedText=null;   /* 마지막으로 저장/로드된 내용(자동 저장 중복 쓰기 방지 + 변경감지 기준선) */
+  var live=0;           /* 편집기에 실린 문서가 바뀔 때마다 +1(로드·탭 복원) — 쓰는 도중 문서가 바뀌면 기준선을 엉뚱한 문서에 넣지 않게 */
   /* 변경감지: 현재 편집 내용이 마지막 저장/로드 기준선과 다르면 dirty. 문서 교체 가드가 사용. */
-  window.__markClean=function(){savedText=ta.value;};
+  window.__markClean=function(){savedText=ta.value;live++;};
   window.__isDirty=function(){return document.body.classList.contains("loaded")&&ta.value!==savedText;};
   window.__getSaved=function(){return savedText;};                 /* 탭 스냅샷: 현재 저장 기준선 읽기 */
-  window.__setSaved=function(t){savedText=(t==null?null:t);};      /* 탭 복원: 기준선 되돌려 dirty 상태 보존 */
+  window.__setSaved=function(t){savedText=(t==null?null:t);live++;};   /* 탭 복원: 기준선 되돌려 dirty 상태 보존 */
+  /* 쓰기가 끝났을 때: 그 사이 편집기 문서가 그대로면 기준선 갱신+탭 점 재계산, 바뀌었으면 그 경로의 탭에 반영 */
+  function markSaved(gen,path,text){
+    if(gen===live){savedText=text;if(window.__tabsOnEdit)window.__tabsOnEdit();}   /* 안 하면 다음 입력·탭 전환 때까지 미저장 점이 남음 */
+    else if(window.__tabsMarkSaved)window.__tabsMarkSaved(path,text);
+  }
   /* 짧은 토스트(이미지 추가 알림 #fbToast 요소·CSS 재사용) */
   function toast(msg){if(window.__toast)window.__toast(msg);}   /* 공용 토스트(뷰어 우상단 앵커) 위임 */
+  /* 반환: true = 저장됨(브라우저는 다운로드), false = 취소·실패·문서 없음 → '저장하고 닫기'·종료 확인이 이걸 보고 멈춘다 */
   window.__saveMd=async function(){
-    if(!document.body.classList.contains("loaded"))return;   /* 문서 없으면 무시 */
-    var text=ta.value;
+    if(!document.body.classList.contains("loaded"))return false;   /* 문서 없으면 무시 */
+    var text=ta.value,gen=live;
     var isExe=(typeof window.NL_PORT!=="undefined"&&typeof window.Neutralino!=="undefined");
     var defName=window.__mdName||((window.__fname||"document")+".md");
     if(isExe){
       try{
-        var path=window.__mdPath;
+        var path=window.__mdPath,picked=false;
         if(!path){   /* 드롭 등 경로 미확보 → 저장 위치 1회 지정 */
           path=await Neutralino.os.showSaveDialog("Markdown 저장",{defaultPath:defName,filters:[{name:"Markdown",extensions:["md","markdown","txt"]},{name:"모든 파일",extensions:["*"]}]});
-          if(!path)return;   /* 취소 */
+          if(!path)return false;   /* 취소 */
           if(!/\.(md|markdown|txt)$/i.test(path))path+=".md";
+          picked=true;
+        }
+        await Neutralino.filesystem.writeFile(path,text);
+        if(picked&&gen===live){   /* 새 경로는 실제로 써진 뒤에만 문서에 붙인다(쓰기 실패 시 이 문서가 엉뚱한 경로를 갖지 않게) */
           window.__mdPath=path;
           window.__mdDir=path.replace(/[\\\/][^\\\/]*$/,"");
           window.__mdName=path.replace(/^.*[\\\/]/,"");
           window.__fname=window.__mdName.replace(/\.(md|markdown|txt)$/i,"");
           if(window.__renderFileBadge)window.__renderFileBadge();
         }
-        await Neutralino.filesystem.writeFile(path,text);
-        savedText=text;
+        markSaved(gen,path,text);
+        if(picked&&gen===live&&window.__tabsRefresh)window.__tabsRefresh();   /* 탭 이름·툴팁을 새 파일명으로 */
         toast("저장됨");
-        if(window.__tabsOnEdit)window.__tabsOnEdit();   /* 기준선이 바뀌었으니 탭의 미저장 점 재계산(안 하면 다음 입력·탭 전환 때까지 점이 남음) */
-      }catch(e){try{Neutralino.debug.log("[save] "+e);}catch(_){}if(window.__appAlert)window.__appAlert("저장 중 문제가 발생했습니다.","오류");else alert("저장 중 문제가 발생했습니다.");}
+        return true;
+      }catch(e){try{Neutralino.debug.log("[save] "+e);}catch(_){}if(window.__appAlert)window.__appAlert("저장 중 문제가 발생했습니다.","오류");else alert("저장 중 문제가 발생했습니다.");return false;}
     }else{   /* 브라우저: 다운로드 */
-      try{var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=defName;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);if(window.__appAlert)window.__appAlert("'"+defName+"' 파일을 다운로드했습니다.","다운로드 완료");else toast("다운로드됨");}catch(e){}
+      try{var blob=new Blob([text],{type:"text/markdown;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=defName;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1000);if(window.__appAlert)window.__appAlert("'"+defName+"' 파일을 다운로드했습니다.","다운로드 완료");else toast("다운로드됨");return true;}catch(e){return false;}
     }
   };
   /* 자동 저장: 편집 멈춘 뒤 미리보기 갱신 시점에 호출. EXE + 경로 있을 때만, 변경 있을 때만 조용히 저장. */
   window.__autoSaveMd=async function(){
     if(!document.body.classList.contains("loaded"))return;
     var isExe=(typeof window.NL_PORT!=="undefined"&&typeof window.Neutralino!=="undefined");
-    if(!isExe||!window.__mdPath)return;              /* 브라우저 또는 경로 미확보 → 조용히 스킵 */
-    var text=ta.value; if(text===savedText)return;   /* 변경 없음 → 쓰기 생략 */
-    try{await Neutralino.filesystem.writeFile(window.__mdPath,text);savedText=text;toast("자동 저장됨");if(window.__tabsOnEdit)window.__tabsOnEdit();}   /* 저장 후 탭 점 재계산 — 자동 저장은 입력 후에 일어나 이게 없으면 점이 항상 떠 있음 */
+    var path=window.__mdPath;
+    if(!isExe||!path)return;                         /* 브라우저 또는 경로 미확보 → 조용히 스킵 */
+    var text=ta.value,gen=live; if(text===savedText)return;   /* 변경 없음 → 쓰기 생략 */
+    try{await Neutralino.filesystem.writeFile(path,text);markSaved(gen,path,text);toast("자동 저장됨");}   /* 저장 후 탭 점 재계산 — 자동 저장은 입력 후에 일어나 이게 없으면 점이 항상 떠 있음 */
     catch(e){try{Neutralino.debug.log("[autosave] "+e);}catch(_){}}   /* 실패는 조용히 무시 */
   };
   document.addEventListener("keydown",function(e){
@@ -822,11 +905,9 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
     pos=Math.min(Math.max(0,pos|0),ta.value.length);
     var before=ta.value.slice(0,pos),after=ta.value.slice(pos);
     var block=(before&&!/\n$/.test(before)?"\n":"")+snippet+(after&&!/^\n/.test(after)?"\n":"");
-    var nt=before+block+after;ta.value=nt;
-    var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function")mirror.innerHTML=hlMd(nt);
+    window.__applyEdit(before+block+after);   /* 실행취소·●·자동 저장이 따라오게(ta.value= 직접 대입 금지) */
     try{ta.selectionStart=ta.selectionEnd=(before+block).length;ta.focus();}catch(e){}
-    if(mirror){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
-    if(typeof renderPreview==="function")renderPreview(nt,true);
+    if(window.__flushEdit)window.__flushEdit(true);   /* 2초 기다리지 않고 바로 미리보기(+자동 저장) */
   };
   /* 탐색기 이미지 미리보기용: 경로의 원본 바이트를 data URL 로(썸네일 표시용, 인코딩 없이 원본). */
   window.__imgDataUrl=async function(abs){try{return await readAsDataUrl(abs);}catch(e){log("[imgpreview] "+abs);return null;}};
@@ -894,11 +975,9 @@ window.__resolveLocalImages=async function(src){
         var refs=added.map(function(n){var alt=n.replace(/\.[a-z0-9]+$/i,"");var dest=/\s/.test(n)?"<"+n+">":n;return "!["+alt+"]("+dest+")";}).join("\n");
         var pos=Math.min(Math.max(0,insAt|0),ta.value.length),before=ta.value.slice(0,pos),after=ta.value.slice(pos);
         var block=(before&&!/\n$/.test(before)?"\n":"")+refs+(after&&!/^\n/.test(after)?"\n":"");
-        var nt=before+block+after;ta.value=nt;
-        var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function")mirror.innerHTML=hlMd(nt);
+        window.__applyEdit(before+block+after);   /* 실행취소·●·자동 저장이 따라오게(ta.value= 직접 대입 금지) */
         try{ta.selectionStart=ta.selectionEnd=(before+block).length;}catch(e){}
-        if(mirror){mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
-        renderPreview(nt,true);
+        if(window.__flushEdit)window.__flushEdit(true);   /* 2초 기다리지 않고 바로 미리보기(+자동 저장) */
       }else{
         renderPreview(ta?ta.value:(window.__lastText||""),true);
       }
@@ -984,9 +1063,8 @@ window.__resolveLocalImages=async function(src){
     });
     if(!changed)return;
     out=out.replace(/\n{3,}/g,"\n\n");  /* 참조만 있던 줄이 비면서 생긴 과한 빈 줄 정리 */
-    ta.value=out;
-    var mirror=document.getElementById("raw");if(mirror&&typeof hlMd==="function"){mirror.innerHTML=hlMd(out);mirror.scrollTop=ta.scrollTop;mirror.scrollLeft=ta.scrollLeft;}
-    if(typeof renderPreview==="function")renderPreview(out,true);
+    window.__applyEdit(out);   /* Ctrl+Z 한 번으로 되돌릴 수 있게 + ●·자동 저장(ta.value= 직접 대입 금지) */
+    if(window.__flushEdit)window.__flushEdit(true);   /* 바로 미리보기 */
   }
   var badge=document.getElementById("fileBadge"),num=document.getElementById("fileBadgeN"),pop=document.getElementById("filePop");
   function build(){
@@ -1254,13 +1332,15 @@ window.__resolveLocalImages=async function(src){
       if(tries>=MAX){clearInterval(t);hideUpd();if(go)go.disabled=false;if(window.__appAlert)window.__appAlert("업데이트 시간이 초과되었습니다. 앱은 그대로 유지됩니다.","업데이트 실패");}
     },500);
   }
-  function install(){
+  async function install(){
     if(!latest||!latest.tag){setMsg("bad","릴리스 정보를 확인하지 못했어요.");return;}
     if(!verGt(latest.tag,CUR)){setMsg("ok","이미 최신 버전입니다. (v"+CUR+")");hideAct();if(settingsBtn)settingsBtn.classList.remove("has-update");return;}  /* 최신이면 설치 실행 안 함(안전장치) */
     if(!latest.exeUrl){setMsg("bad","설치할 exe 자산이 없습니다.");return;}
     var base=String(window.NL_PATH||"").replace(/[\\/]+$/,"");
     if(!base){setMsg("bad","앱 경로를 확인하지 못했어요.");return;}
     var target=base+"\\"+EXE,total=latest.size||0;
+    /* 설치가 끝나면 앱이 꺼졌다 다시 켜진다 → 저장 안 한 문서가 있으면 먼저 저장/버리기/취소(다운로드 중엔 화면이 덮여 편집 불가) */
+    if(window.__confirmExit&&!(await window.__confirmExit({title:"업데이트 설치",action:"설치"})))return;
     if(go)go.disabled=true;
     Neutralino.os.getEnv("TEMP").then(function(tmp){
       var dir=(tmp||base),name="mdeautify-update.ps1",updDir=dir+"\\mdeautify-update";

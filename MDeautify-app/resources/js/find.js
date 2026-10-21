@@ -77,8 +77,12 @@
       ta.dispatchEvent(new Event("input",{bubbles:true}));}
   }
 
+  /* 결과가 지금 내용과 맞는지(코드로 내용이 통째 바뀐 뒤 낡은 오프셋으로 자르지 않게) */
+  function stillMatches(m){var hay=ta.value.slice(m[0],m[1]);return cs?hay===term:hay.toLowerCase()===term.toLowerCase();}
+
   function replaceOne(){
     if(cur<0||!matches[cur])return;
+    if(!stillMatches(matches[cur])){recompute(ta.selectionStart,true);return;}   /* 낡은 결과 → 다시 찾기만 하고 멈춤 */
     var m=matches[cur],repl=fbRepl.value;
     ta.setSelectionRange(m[0],m[1]);
     insertViaCmd(repl);                       /* 'input' → 미러/미리보기 + ta input 리스너 recompute */
@@ -86,7 +90,8 @@
   }
 
   function replaceAll(){
-    if(!matches.length)return;
+    computeMatches();   /* 항상 지금 내용으로 다시 센다(탭 전환 등으로 낡은 결과로 다른 문서를 자르던 문제) */
+    if(!matches.length){cur=-1;renderHl();updateUi();return;}
     var text=ta.value,out="",pos=0,cnt=matches.length;
     for(var k=0;k<matches.length;k++){out+=text.slice(pos,matches[k][0])+fbRepl.value;pos=matches[k][1];}
     out+=text.slice(pos);
@@ -135,4 +140,7 @@
 
   /* 사용자가 원본을 직접 편집하면 하이라이트 갱신(이동은 안 함) */
   ta.addEventListener("input",function(){if(barOpen)recompute(ta.selectionStart,false);});
+  /* 탭 전환·문서 열기처럼 편집기 내용이 코드로 통째 바뀐 뒤(input 이벤트 없음) — tabs.js·renderMarkdown 이 부른다 */
+  window.__findRefresh=function(){if(barOpen)recompute(0,false);else{matches=[];cur=-1;}};
+  window.__findClose=function(){if(barOpen)close();};   /* 마지막 탭을 닫아 문서가 없을 때 */
 })();

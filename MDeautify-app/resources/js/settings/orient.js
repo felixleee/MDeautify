@@ -31,7 +31,7 @@
     window.__pageOrient=cb.checked?"landscape":"portrait";
     MD2R.save(KEY,window.__pageOrient);
     apply();
-    if(window.__lastText&&typeof renderMarkdown==="function")renderMarkdown(window.__lastText);
+    if(window.__reflowPreview)window.__reflowPreview();   /* 미리보기만 다시 조판(편집기·저장 기준선은 그대로) */
   });
   MD2R.register(function(){if(cb)MD2R.save(KEY,cb.checked?"landscape":"portrait");},[KEY]);
 })();

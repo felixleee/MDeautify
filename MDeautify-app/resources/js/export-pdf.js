@@ -91,7 +91,7 @@
       else alert("변환된 내용이 없습니다. 먼저 MD 파일을 불러오세요.");
       return;
     }
-    if(!isExe()){window.print();return;}   /* 브라우저 모드: 기존 인쇄 대화상자 */
+    if(!isExe()){if(window.__readyToPrint)await window.__readyToPrint();window.print();return;}   /* 브라우저 모드: 기존 인쇄 대화상자 */
 
     var browser=await findBrowser();
     if(!browser){window.print();return;}   /* Edge/Chrome 없음 → 인쇄 대화상자 폴백 */
@@ -109,6 +109,11 @@
     showBusy("PDF 저장 중…");
     var tmpHtml=null,tmpPs1=null;
     try{
+      /* 대기 중인 입력·진행 중인 조판을 끝낸 미리보기로 내보낸다(고치고 2초 안에 누르면 고치기 전 내용이 찍히던 문제) */
+      if(window.__readyToPrint)await window.__readyToPrint();
+      /* 같은 이름 PDF 가 이미 있으면 수정 시각을 기억 → 끝난 뒤에도 그대로면 '덮어쓰지 못함'(PDF 뷰어가 열어 잠금 등).
+         크기만 보면 옛 PDF 를 성공으로 알고 열어 버린다. */
+      var before=null;try{var st0=await Neutralino.filesystem.getStats(outPath);before=(st0&&typeof st0.modifiedAt==="number")?st0.modifiedAt:null;}catch(e){}
       var tmp=await Neutralino.os.getEnv("TEMP");
       tmpHtml=tmp+"\\mdeautify_export.html";
       tmpPs1=tmp+"\\mdeautify_export.ps1";
@@ -132,10 +137,15 @@
       /* 상대 파일명 + cwd 로 실행(경로 공백/인용부호 회피) — 업데이트 흐름과 동일 패턴. background 아님 → 완료까지 대기. */
       await Neutralino.os.execCommand("powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File mdeautify_export.ps1",{cwd:tmp});
 
-      var ok=false;
-      try{var st=await Neutralino.filesystem.getStats(outPath);ok=st&&st.size>0;}catch(e){ok=false;}
+      var ok=false,stale=false;
+      try{
+        var st=await Neutralino.filesystem.getStats(outPath);ok=st&&st.size>0;
+        if(ok&&before!=null&&typeof st.modifiedAt==="number"&&st.modifiedAt<=before){ok=false;stale=true;}   /* 파일은 있는데 안 바뀜 = 옛 PDF */
+      }catch(e){ok=false;}
       if(ok){
         try{await Neutralino.os.open(outPath);}catch(e){}   /* 만든 PDF 열기 */
+      }else if(stale){   /* Edge 문제가 아니라 파일 잠금 → 인쇄 대화상자 폴백 대신 원인 안내 */
+        if(window.__appAlert)window.__appAlert("같은 이름의 PDF가 다른 프로그램(PDF 뷰어 등)에 열려 있어 덮어쓰지 못했어요.\n그 창을 닫고 다시 저장하거나 다른 이름으로 저장해 주세요.","PDF 저장 안 됨");
       }else{
         if(window.__appAlert)window.__appAlert("PDF 생성에 실패했습니다. 인쇄 대화상자로 진행합니다.","오류");
         window.print();

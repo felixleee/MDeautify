@@ -95,12 +95,15 @@
     if(typeof renderPreview==="function")renderPreview(s.text,false);
     if(t){t.scrollTop=s.scroll||0;if(m){m.scrollTop=t.scrollTop;m.scrollLeft=t.scrollLeft;}}
     var fh=document.getElementById("findHl");if(fh)fh.innerHTML="";   /* 이전 탭의 찾기 하이라이트 잔상 제거 */
+    if(window.__findRefresh)window.__findRefresh();   /* 열린 찾기 바의 결과를 이 문서 기준으로(이전 문서 오프셋으로 '모두 변경'하지 않게) */
     if(window.__renderFileBadge)window.__renderFileBadge();
     if(window.__aiRestore)window.__aiRestore(s.ai);   /* 이 문서의 대화로 교체(없으면 새 대화) */
   }
 
-  function switchTo(id){
+  async function switchTo(id){
     if(id===activeId)return;
+    if(window.__flushEdit)await window.__flushEdit(false);   /* 나가는 문서의 대기 중 입력: 타이머 취소+자동 저장 — 안 하면 2초 뒤 들어온 문서를 조판·저장 */
+    if(id===activeId||!byId(id))return;                     /* 기다리는 사이 상황이 바뀌었으면 중단 */
     snapshotActive();
     activeId=id;
     restore(byId(id));
@@ -110,13 +113,16 @@
   /* 문서 열기/포커스: app.js 의 openMd·drop·loadFile·recover 가 호출 */
   function openDoc(meta){
     meta=meta||{};
+    if(window.__cancelEdit)window.__cancelEdit();   /* 이전 문서의 대기 중 입력 타이머 취소(내용은 아래 스냅샷에 남음) — 안 하면 2초 뒤 새 문서를 또 조판 */
     snapshotActive();
     if(meta.path){
       var ex=findByPath(meta.path);
       if(ex){activeId=ex.id;restore(ex);renderTabs();return;}   /* 이미 열림 → 포커스 */
     }
+    /* meta.baseline: 저장 기준선을 따로 줄 때(연결 복구 — 미저장 편집의 ● 유지). 없으면 열자마자 clean */
+    var hasBase=(typeof meta.baseline==="string");
     var s={id:seq++,path:meta.path||null,dir:meta.dir||null,name:meta.name||"document",
-           fname:meta.fname||"document",text:meta.text||"",baseline:meta.text||"",
+           fname:meta.fname||"document",text:meta.text||"",baseline:hasBase?meta.baseline:(meta.text||""),
            drop:meta.drop||{},imgFiles:[],scroll:0};
     sessions.push(s);activeId=s.id;
     /* 신규 탭 = 라이브에 실어 renderMarkdown 으로 로드(baseline clean, 미러·프리뷰·이미지 처리 일괄) */
@@ -124,12 +130,15 @@
     window.__drop=s.drop;window.__imgFiles=[];
     document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayoutPanes();
     if(typeof renderMarkdown==="function")renderMarkdown(s.text);
+    if(hasBase&&window.__setSaved)window.__setSaved(s.baseline);   /* 기준선 복원 → 미저장이면 ● 그대로 */
     if(window.__renderFileBadge)window.__renderFileBadge();
     if(window.__aiRestore)window.__aiRestore(s.ai);   /* 새 문서 = 새 대화(restore 를 안 거치는 경로라 여기서 직접) */
     renderTabs();
   }
 
   function clearToEmpty(){
+    if(window.__cancelEdit)window.__cancelEdit();   /* 대기 중 입력 타이머가 빈 화면을 'loaded' 로 되살리지 않게 */
+    if(window.__findClose)window.__findClose();
     activeId=null;
     document.body.classList.remove("loaded");
     window.__mdPath=null;window.__mdDir=null;window.__mdName=null;window.__fname=null;
@@ -146,6 +155,7 @@
 
   async function closeTab(id){
     var s=byId(id);if(!s)return;
+    if(id===activeId&&window.__flushEdit){await window.__flushEdit(false);s=byId(id);if(!s)return;}   /* 대기 중 입력: 타이머 취소+자동 저장(켜져 있으면) */
     if(id===activeId)snapshotActive();   /* 활성 탭이면 라이브 → 세션 반영 후 dirty 판정 */
     var backTo=null;   /* 배경 탭을 저장하려고 잠깐 전환했다면, 닫은 뒤 원래 보던 탭으로 복귀 */
     if(isDirty(s)){
@@ -161,10 +171,9 @@
       if(choice==="save"){
         /* 저장은 라이브(활성)에 대해서만 → 먼저 활성화. ⚠️전환 전에 지금 활성 문서를 스냅샷해야 함 —
            안 하면 그 문서의 마지막 스냅샷 이후 편집(과 AI 대화)이 라이브 상태째 덮여 사라진다. */
-        if(id!==activeId){snapshotActive();backTo=activeId;activeId=id;restore(s);renderTabs();}
-        var hadPath=!!window.__mdPath;
-        if(window.__saveMd)await window.__saveMd();
-        if(!hadPath&&!window.__mdPath)return;   /* 경로 없던 문서 저장 다이얼로그 취소 → 닫기도 취소(유실 방지) */
+        if(id!==activeId){if(window.__flushEdit)await window.__flushEdit(false);snapshotActive();backTo=activeId;activeId=id;restore(s);renderTabs();}
+        var ok=window.__saveMd?await window.__saveMd():false;
+        if(!ok)return;   /* 저장 취소(다이얼로그)·실패(읽기 전용 등) → 닫지 않는다(유실 방지). 실패 안내는 __saveMd 가 띄움 */
         snapshotActive();   /* 저장 후 baseline 갱신 반영 */
       }
     }
@@ -208,6 +217,46 @@
   window.__openDoc=openDoc;
   window.__tabsCount=function(){return sessions.length;};
   window.__closeActiveTab=function(){if(activeId!=null)closeTab(activeId);};
+  /* 다른 이름으로 저장 등으로 활성 문서의 이름·경로가 바뀐 뒤 탭 표시 갱신(app.js __saveMd) */
+  window.__tabsRefresh=function(){snapshotActive();renderTabs();};
+  /* 쓰는 도중 다른 탭으로 넘어간 경우: 그 경로의 (비활성) 탭 기준선을 방금 저장한 내용으로 */
+  window.__tabsMarkSaved=function(path,text){var s=findByPath(path);if(s&&s.id!==activeId){s.baseline=text;renderTabs();}};
+  /* 연결 끊김 복구(recover.js)용: 모든 탭을 직렬화 가능한 형태로(활성 탭은 라이브 상태 반영 후) + 활성 탭 순번 — MDhwpxify 와 같은 모양 */
+  window.__tabsExport=function(){
+    snapshotActive();
+    var act=-1;
+    var docs=sessions.map(function(s,i){if(s.id===activeId)act=i;return {path:s.path,dir:s.dir,name:s.name,fname:s.fname,text:s.text,baseline:s.baseline,drop:s.drop||{}};});
+    return {active:act,docs:docs};
+  };
+  window.__tabsActivate=function(i){var s=sessions[i];if(s)return switchTo(s.id);};
+
+  /* 앱이 꺼지기 전(창 X·업데이트 설치): 저장 안 한 문서가 있으면 '모두 저장하고 종료 / 저장 안 함 / 취소'.
+     true = 꺼져도 됨, false = 취소(저장 다이얼로그 취소·쓰기 실패 포함 — 그 문서를 띄운 채 멈춘다).
+     opts.action: 문구·버튼의 동사("종료"·"설치"), opts.title: 창 제목 */
+  window.__confirmExit=async function(opts){
+    opts=opts||{};
+    if(window.__flushEdit)await window.__flushEdit(false);
+    snapshotActive();
+    var ds=sessions.filter(isDirty);
+    if(!ds.length||!window.__confirmSave3)return true;
+    var act=opts.action||"종료";
+    var list=ds.slice(0,5).map(function(s){return "· "+(s.name||"문서");}).join("\n")+(ds.length>5?"\n· 외 "+(ds.length-5)+"개":"");
+    var choice=await window.__confirmSave3({
+      title:opts.title||"저장하지 않은 문서",
+      message:"저장하지 않은 변경사항이 있는 문서가 "+ds.length+"개 있어요.\n"+list+"\n\n저장한 뒤 "+act+"할까요?",
+      saveText:"모두 저장하고 "+act,discardText:"저장 안 함",cancelText:"취소"
+    });
+    if(choice==="cancel")return false;
+    if(choice==="discard")return true;
+    for(var i=0;i<ds.length;i++){
+      var s=ds[i];if(!byId(s.id))continue;
+      if(s.id!==activeId){snapshotActive();activeId=s.id;restore(s);renderTabs();}   /* 저장은 라이브(활성) 문서에만 → 차례로 띄워 저장 */
+      var ok=window.__saveMd?await window.__saveMd():false;
+      if(!ok)return false;
+      snapshotActive();renderTabs();
+    }
+    return true;
+  };
 
   /* ===== Ctrl/Cmd+W: 현재 문서(활성 탭) 닫기 =====
      - 더티(미저장)면 저장/버리기/취소 모달, 마지막 탭이면 빈 화면 → 기존 closeTab 로직 그대로 재사용.

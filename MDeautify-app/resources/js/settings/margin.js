@@ -53,7 +53,7 @@
     if(!changed)return;
     MD2R.save(KEY,[m.t,m.r,m.b,m.l].join(","));
     clearTimeout(rt);
-    rt=setTimeout(function(){if(window.__lastText&&typeof renderMarkdown==="function")renderMarkdown(window.__lastText);},250);
+    rt=setTimeout(function(){if(window.__reflowPreview)window.__reflowPreview();},250);   /* 미리보기만 다시 조판(편집기·저장 기준선은 그대로) */
   }
   function load(){var v=null;try{v=localStorage.getItem(KEY);}catch(e){}apply(parse(v)||PRESETS.normal);}
   load();
