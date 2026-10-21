@@ -40,7 +40,7 @@
     img:"<span class='ex-svg img'><svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='16' rx='2'/><circle cx='8.5' cy='9.5' r='1.5'/><path d='M21 15l-5-5L5 20'/></svg></span>"
   };
 
-  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}   /* 작은따옴표 속성(title='…')에 넣으므로 ' 도 — 파일·폴더 이름에 ' 가 있으면 속성이 잘렸다 */
   function readJson(k){try{var v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
   function loadFolders(){var a=readJson(FKEY);folders=(a&&a.length)?a.slice():[];if(dedupeFolders())saveFolders();}
   function saveFolders(){try{localStorage.setItem(FKEY,JSON.stringify(folders));}catch(e){}}

@@ -163,7 +163,7 @@ srcmd=outsideCode(srcmd,function(s){
   return s;
 });
 var src=document.getElementById("src");
-src.innerHTML=buildCover(meta)+"<div class='content'>"+marked.parse(srcmd)+"</div>";
+src.innerHTML=buildCover(meta)+"<div class='content'>"+window.__sanitize(marked.parse(srcmd))+"</div>";   /* md 안 HTML 은 정화한 뒤에만 넣는다(js/sanitize.js) — 남이 준 md 의 onerror 등이 앱 권한으로 돌지 않게 */
 /* GitHub 스타일 heading 슬러그 id 부여 → 목차 [..](#슬러그) 내부 링크가 해당 섹션으로 스크롤(뷰어 클릭 핸들러). .sn 가공 전 원문 텍스트 기준, 중복 슬러그는 -1,-2 접미(GitHub 동일). */
 (function(){var seen={};src.querySelectorAll(".content h1,.content h2,.content h3,.content h4,.content h5,.content h6").forEach(function(h){
   if(h.id)return;
@@ -193,6 +193,10 @@ if(window.__tocOn){
     if(_content)src.insertBefore(_toc,_content);
   }
 }
+/* 정화(sanitize.js SANITIZE_NAMED_PROPS)가 글 속 HTML 의 id 앞에 user-content- 를 붙인다 → 그 id 로 가는 #링크를 맞춘다(미리보기·PDF 공통). 제목 id 는 정화 뒤에 붙여 해당 없음. */
+(function(){var ids={};src.querySelectorAll("[id]").forEach(function(el){ids[el.id]=1;});
+  src.querySelectorAll('.content a[href^="#"]').forEach(function(a){var h=a.getAttribute("href").slice(1),d;try{d=decodeURIComponent(h);}catch(_){d=h;}
+    if(d&&!ids[d]&&ids["user-content-"+d])a.setAttribute("href","#user-content-"+h);});})();
 /* 링크 구분: 내부 앵커(#..)=섹션 이동(sec-link, 뷰어 클릭 핸들러가 처리) / 그 외=외부 웹 링크(ext-link, 새 탭). CSS 가 §·↗ 마커로 시각 구분. */
 src.querySelectorAll(".content a[href]").forEach(function(a){var hv=a.getAttribute("href")||"";if(hv.charAt(0)==="#"){a.classList.add("sec-link");return;}a.classList.add("ext-link");a.setAttribute("target","_blank");a.setAttribute("rel","noopener noreferrer");});
 src.querySelectorAll(".content h1, .content h2, .content h3").forEach(function(h){var m=h.innerHTML.match(/^([A-Z])[.)·]?\s+([\s\S]*)$/);if(m)h.innerHTML="<span class='sn'>"+m[1]+"</span>"+m[2];});
@@ -1049,7 +1053,7 @@ window.__resolveLocalImages=async function(src){
 })();
 /* ===== 불러온 파일 뱃지 + 팝오버 (문서 + 참조 이미지 상태 + 미참조 드롭 이미지) ===== */
 (function(){
-  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}   /* 작은따옴표 속성(title='…'·data-rm='…')에 넣으므로 ' 도 */
   /* '식별안됨' 이미지 = MD에 ![](이름) 참조가 있으나 못 찾음 → 그 참조를 본문에서 삭제(파일명/경로 basename 일치). */
   function removeRefFromMd(name){
     var ta=document.getElementById("rawInput");if(!ta)return;
@@ -1200,7 +1204,7 @@ window.__resolveLocalImages=async function(src){
         var tag=String(j.tag_name||j.name||"").replace(/^v/i,"");
         return {ver:tag?("v"+tag):(j.name||"릴리스"),
                 date:String(j.published_at||j.created_at||"").slice(0,10),
-                html:(j.body&&typeof marked!=="undefined")?marked.parse(stripHead(j.body)):esc(j.body||"")};
+                html:(j.body&&typeof marked!=="undefined")?window.__sanitize(marked.parse(stripHead(j.body))):esc(j.body||"")};   /* 릴리스 노트도 정화(GitHub 에서 받은 글 — 저장소가 털려도 앱 권한으로 돌지 않게) */
       });});
   }
   function renderList(items){
