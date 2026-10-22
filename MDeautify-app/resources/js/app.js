@@ -323,6 +323,27 @@ var pgWait=[];
 function pgSettle(gen){window.__pgDoneGen=gen;for(var i=pgWait.length-1;i>=0;i--){if(pgWait[i].g<=gen){pgWait[i].r();pgWait.splice(i,1);}}}
 function pgUntil(gen){return (window.__pgDoneGen||0)>=gen?Promise.resolve():new Promise(function(r){pgWait.push({g:gen,r:r});});}
 window.__whenPaged=function(){return pgUntil(window.__pgGen||0);};
+/* Paged.js 는 조판마다 head 에 <style> 3개(기본 규칙·페이지 규칙·조판 CSS)를 넣고 스스로 지우지 않는다 → 지난 조판 것을 안 지우면
+   편집할수록 쌓여(27쪽 문서 60번에 <style> 550개·CSS 5.7MB) 조판이 점점 느려지고 PDF 용 HTML 도 불어난다.
+   화면에 보이는 조판의 Previewer(shownPv)만 남기고, 화면에서 내려가거나 버려진 조판은 dropPv 로 스타일·쪽 크기 감시를 정리한다. */
+var shownPv=null;
+function dropPv(pv){
+  if(!pv)return;
+  try{pv.polisher.destroy();}catch(e){}
+  try{(pv.chunker&&pv.chunker.pages||[]).forEach(function(pg){if(pg.removeListeners)pg.removeListeners();});}catch(e){}   /* 쪽마다 붙은 ResizeObserver */
+}
+/* 조판 검증용: 쪽 내용이 숨은 둘째 단(column)으로 넘쳐 '보이는 내용'이 가려졌는지.
+   scrollWidth 만 보면 쪽 끝에서 잘린 코드블록 등을 감싼 div 의 몇 px 빈 조각도 넘침으로 잡혀(단 간격이 커서 3px 만 넘어도 scrollWidth 가 몇 배)
+   같은 결과를 두 번 더 조판했다(긴 문서는 편집할 때마다 조판 3배). → 숨은 단에 글자나 그림이 있을 때만 참. */
+function pageHasHiddenContent(pc){
+  if(pc.scrollWidth<=pc.clientWidth+4)return false;
+  var edge=pc.getBoundingClientRect().right-1,rg=document.createRange(),rs,k;
+  var tw=document.createTreeWalker(pc,NodeFilter.SHOW_TEXT),n;
+  while((n=tw.nextNode())){if(!/\S/.test(n.nodeValue))continue;rg.selectNodeContents(n);rs=rg.getClientRects();for(k=0;k<rs.length;k++)if(rs[k].left>=edge&&rs[k].width>0)return true;}
+  var pics=pc.querySelectorAll("img,svg,video,canvas,iframe,object");
+  for(var i=0;i<pics.length;i++){rs=pics[i].getClientRects();for(k=0;k<rs.length;k++)if(rs[k].left>=edge&&rs[k].width>0&&rs[k].height>0)return true;}
+  return false;
+}
 function runPaged(src,keepScroll,attempt){
   attempt=attempt||0;
   var myGen=(window.__pgGen=(window.__pgGen||0)+1);   /* 이 조판의 세대 번호. 더 새 조판이 시작되면 이 결과는 폐기(탭 전환·연속 편집 경쟁 방지) */
@@ -360,20 +381,24 @@ function runPaged(src,keepScroll,attempt){
   document.body.appendChild(staging);
   function dropStaging(){if(staging&&staging.parentNode)staging.parentNode.removeChild(staging);staging=null;}
   function swapIn(){pages.innerHTML="";while(staging.firstChild)pages.appendChild(staging.firstChild);dropStaging();}
-  function fail(err){if(myGen!==window.__pgGen){dropStaging();return;}if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();pgSettle(myGen);}
+  var prev=null;
+  function release(){if(blobUrl){try{URL.revokeObjectURL(blobUrl);}catch(e){}blobUrl=null;}}   /* Paged.js 가 다 읽은 조판 CSS blob 해제(조판마다 남던 것) */
+  function fail(err){release();if(prev===shownPv)shownPv=null;dropPv(prev);if(myGen!==window.__pgGen){dropStaging();return;}if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();pgSettle(myGen);}
   /* 콘텐츠 맨 앞에 <style> 태그를 붙이면 Paged.js 가 첫 페이지를 복제하는 버그가 있다(표지 없는 문서에서 발현).
      → PAGED_CSS 는 스타일시트(blobUrl)로만 넘기고, blob 생성 실패 시에만 인라인 <style> 폴백. */
   var content=blobUrl?src.innerHTML:("<style>"+pagedCss()+"</style>"+src.innerHTML);
   try{
-    var prev=new window.PagedModule.Previewer();
+    prev=new window.PagedModule.Previewer();
     prev.preview(content, blobUrl?[blobUrl]:[], staging).then(function(flow){
-      if(myGen!==window.__pgGen){dropStaging();return;}   /* 더 새 조판이 시작됨 → 이 결과 폐기 */
-      /* 조판 검증: 한 페이지 내용이 한 단을 넘어 다단으로 흘러넘쳤으면(=분할 미완결/경쟁으로 깨짐) 재조판.
-         정상 페이지는 scrollWidth==clientWidth(단일 단). 간헐적 '간격 과하게 넓음/뷰어 깨짐'의 실제 원인. */
+      release();
+      if(myGen!==window.__pgGen){dropStaging();dropPv(prev);return;}   /* 더 새 조판이 시작됨 → 이 결과 폐기(스타일도) */
+      /* 조판 검증: 한 페이지 내용이 숨은 둘째 단으로 흘러넘쳐 가려졌으면(=분할 미완결/경쟁으로 깨짐) 재조판.
+         간헐적 '간격 과하게 넓음/뷰어 깨짐'의 실제 원인. 빈 조각만 넘친 건 제외(pageHasHiddenContent). */
       var bad=false,pcs=staging.querySelectorAll(".pagedjs_page_content");
-      for(var bi=0;bi<pcs.length;bi++){if(pcs[bi].scrollWidth>pcs[bi].clientWidth+4){bad=true;break;}}
-      if(bad&&attempt<2){dropStaging();setTimeout(function(){if(myGen===window.__pgGen)runPaged(src,keepScroll,attempt+1);},50);return;}   /* 한 박자 쉬고 재조판(레이아웃 안정 후) */
+      for(var bi=0;bi<pcs.length;bi++){if(pageHasHiddenContent(pcs[bi])){bad=true;break;}}
+      if(bad&&attempt<2){dropStaging();dropPv(prev);setTimeout(function(){if(myGen===window.__pgGen)runPaged(src,keepScroll,attempt+1);},50);return;}   /* 한 박자 쉬고 재조판(레이아웃 안정 후) */
       swapIn();   /* 표 머리글 반복은 조판 중에 RepeatTableHeaders 핸들러가 이미 넣었다 */
+      var gone=shownPv;shownPv=prev;dropPv(gone);   /* 화면에서 내려간 지난 조판의 head <style> 정리 */
       if(typeof applyFooter==="function")applyFooter();
       if(typeof applyHeader==="function")applyHeader();
       if(typeof fillToc==="function")fillToc();
