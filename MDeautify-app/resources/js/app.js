@@ -344,18 +344,65 @@ function pageHasHiddenContent(pc){
   for(var i=0;i<pics.length;i++){rs=pics[i].getClientRects();for(k=0;k<rs.length;k++)if(rs[k].left>=edge&&rs[k].width>0&&rs[k].height>0)return true;}
   return false;
 }
-function runPaged(src,keepScroll,attempt){
+/* 이미지 풀에서 <img> 경로로 찾기(드롭·이전 렌더에서 읽어 둔 data URI). marked 가 공백·한글을 %인코딩하므로 복원해 파일명과 맞춘다 */
+function poolHit(drop,raw){
+  if(!drop)return null;
+  var s=raw;try{s=decodeURIComponent(raw);}catch(e){}
+  return drop[s.replace(/^\.\//,"").replace(/\\/g,"/")]||drop[s.split(/[\\/]/).pop()]||null;
+}
+var BLANK_IMG="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+/* 편집기 맨 위에 보이는 원본 줄(색상 미러 .ln[data-ln] 을 이분 탐색). 편집기가 접혀 있거나 맨 위면 0 */
+function editorTopLine(){
+  var ta=document.getElementById("rawInput"),mir=document.getElementById("raw");
+  if(!ta||!mir||!ta.scrollTop||document.body.classList.contains("editor-collapsed"))return 0;
+  var lns=mir.getElementsByClassName("ln"),top=mir.getBoundingClientRect().top,lo=0,hi=lns.length-1,ans=0;
+  while(lo<=hi){var mid=(lo+hi)>>1,r=lns[mid].getClientRects();if(r.length&&r[0].top<=top+1){ans=mid;lo=mid+1;}else hi=mid-1;}
+  return lns.length?(+lns[ans].getAttribute("data-ln")||0):0;
+}
+/* 다른 문서를 띄울 때(탭 전환·문서 열기): 쪽 나누기가 끝날 때까지 이전 문서의 쪽이 그대로 보이던 문제 —
+   큰 문서는 몇 초 걸려 그동안 탭·편집기와 미리보기가 서로 다른 문서였다.
+   → 이전 쪽을 바로 내리고, 새 문서의 '편집기에 보이는 곳부터' 몇 화면만 쪽 나누기 전 모습으로 먼저 보여 준다. 조판이 끝나면 쪽으로 바뀐다.
+   (몇 화면만: 큰 문서 전체를 복제·배치하면 클릭이 0.3초쯤 더 무거워진다. 조판은 보통 1~2초라 그 사이 더 내려 볼 일이 드물다)
+   아직 안 읽은 로컬 그림은 깨진 그림 대신 빈칸으로(읽고 나면 쪽으로 바뀔 때 보인다). */
+var INTERIM_MAX=600;   /* 먼저 보여 줄 요소 수 상한(대략 2~4화면) */
+function showInterim(src){
+  var pages=document.getElementById("pages"),viewer=document.getElementById("viewer");
+  var d=document.createElement("div");d.className="fallback-doc";
+  var cont=src.querySelector(".content"),kids=cont?cont.children:[],line=editorTopLine(),k=0,i,c;
+  for(i=0;i<kids.length;i++){var sl=kids[i].getAttribute("data-sl");if(sl==null)continue;if(+sl<=line)k=i;else break;}
+  if(!cont||k===0){for(c=src.firstChild;c&&c!==cont;c=c.nextSibling)d.appendChild(c.cloneNode(true));}   /* 문서 처음이면 표지·목차부터 */
+  if(cont){var dc=cont.cloneNode(false),n=0;
+    for(i=k;i<kids.length&&(i===k||n<INTERIM_MAX);i++){var b=kids[i].cloneNode(true);n+=1+b.getElementsByTagName("*").length;dc.appendChild(b);}
+    d.appendChild(dc);}
+  /* 번호 목록(ol)은 번호를 글자로 박은 ul 로 바꿔 보여 준다 — 화면에 ol 이 있으면 조판하는 동안(목록 항목을 넣을 때마다) Chrome 이 문서 전체의 번호를
+     다시 매겨 Paged.js 조판이 2~3배 느려진다(58쪽: 1.5초 → 4초, contain:style 로도 안 막힘). 잠깐 보이는 화면이라 모양만 같으면 된다(ul·ol 은 CSS 가 같다) */
+  var ols=d.getElementsByTagName("ol");
+  while(ols.length){var ol=ols[0],ul=document.createElement("ul"),num=parseInt(ol.getAttribute("start"),10);if(isNaN(num))num=1;
+    for(var li=ol.firstElementChild;li;li=li.nextElementSibling){if(li.tagName!=="LI")continue;var no=num++;if(!li.querySelector(":scope > input[type=checkbox]"))li.style.listStyleType='"'+no+'. "';}
+    while(ol.firstChild)ul.appendChild(ol.firstChild);
+    ol.parentNode.replaceChild(ul,ol);}
+  var drop=window.__drop,ims=d.querySelectorAll("img");
+  for(var j=0;j<ims.length;j++){var s=ims[j].getAttribute("src")||"";if(!/^(https?:|data:|blob:)/i.test(s))ims[j].setAttribute("src",poolHit(drop,s)||BLANK_IMG);}
+  var gone=shownPv;shownPv=null;dropPv(gone);   /* 내린 쪽의 조판 스타일·쪽 크기 감시도 정리 */
+  pages.innerHTML="";pages.appendChild(d);
+  viewer.scrollTop=0;
+}
+/* 문서를 모두 닫았을 때(tabs.js): 진행 중인 조판이 끝나 닫은 문서의 쪽을 빈 화면에 되살리지 않게 세대를 넘기고(기다리던 쪽은 풀어 줌), 보이던 조판 스타일도 정리 */
+window.__cancelPreview=function(){var g=(window.__pgGen=(window.__pgGen||0)+1);pgSettle(g);var gone=shownPv;shownPv=null;dropPv(gone);};
+function runPaged(src,keepScroll,attempt,gen){
   attempt=attempt||0;
-  var myGen=(window.__pgGen=(window.__pgGen||0)+1);   /* 이 조판의 세대 번호. 더 새 조판이 시작되면 이 결과는 폐기(탭 전환·연속 편집 경쟁 방지) */
+  var myGen=gen||(window.__pgGen=(window.__pgGen||0)+1);   /* 이 조판의 세대 번호(renderPreview 가 미리 잡아 넘김). 더 새 렌더가 시작되면 이 결과는 폐기(탭 전환·연속 편집 경쟁 방지) */
   var done=pgUntil(myGen);   /* 이 조판(또는 이를 대신한 더 새 조판)이 끝나면 resolve */
   var pages=document.getElementById("pages");
   var viewer=document.getElementById("viewer");
-  var vMax=viewer.scrollHeight-viewer.clientHeight;
-  var ratio=(keepScroll&&vMax>0)?viewer.scrollTop/vMax:0;
-  /* 재분할 전: 뷰어 상단에 걸려 있던 소스 블록(data-sl)과 그 오프셋을 기록.
-     → 에디터 스크롤과 무관하게 '보고 있던 그 내용'을 기준으로 복원(비율/에디터앵커보다 안정). */
-  var keepSl=null,keepOff=0;
-  if(keepScroll){
+  /* 쪽을 바꿔 끼우기 직전에: 뷰어 상단에 걸려 있던 소스 블록(data-sl)과 그 오프셋을 기록.
+     → 에디터 스크롤과 무관하게 '보고 있던 그 내용'을 기준으로 복원(비율/에디터앵커보다 안정).
+     조판하는 동안에도 스크롤이 움직이므로(탭 전환 뒤 편집기 위치 맞춤·사용자 스크롤) 시작할 때가 아니라 교체 직전에 잰다. */
+  var keepSl=null,keepOff=0,ratio=0;
+  function capture(){
+    if(!keepScroll)return;
+    var vMax=viewer.scrollHeight-viewer.clientHeight;
+    ratio=vMax>0?viewer.scrollTop/vMax:0;
     var vr0=viewer.getBoundingClientRect();
     var old=pages.querySelectorAll("[data-sl]");
     for(var i=0;i<old.length;i++){
@@ -370,8 +417,9 @@ function runPaged(src,keepScroll,attempt){
       if(el){var vr=viewer.getBoundingClientRect();var abs=el.getBoundingClientRect().top-vr.top+viewer.scrollTop;viewer.scrollTop=Math.max(0,abs-keepOff);return;}
     }
     var m=viewer.scrollHeight-viewer.clientHeight;viewer.scrollTop=keepScroll?ratio*m:0;   /* 폴백: 앵커 블록 못 찾으면 비율 */
+    if(!keepScroll&&window.__syncPreviewToEditor)window.__syncPreviewToEditor();   /* 다른 문서(탭 전환·열기): 편집기에 보이는 곳으로(탭으로 돌아오면 보던 자리, 새로 열면 맨 위) */
   }
-  if(!window.PagedModule||!window.PagedModule.Previewer){pages.innerHTML="";fallbackRender(src);restore();pgSettle(myGen);return done;}
+  if(!window.PagedModule||!window.PagedModule.Previewer){capture();pages.innerHTML="";fallbackRender(src);restore();pgSettle(myGen);return done;}
   var blobUrl=null;try{blobUrl=URL.createObjectURL(new Blob([pagedCss()],{type:"text/css"}));}catch(e){}
   /* 새 조판은 화면 밖 임시 컨테이너에서 완료한 뒤 한 번에 교체 → 편집 중 '기존 내용이 비었다가 다시 채워지는' 깜빡임 제거.
      교체 전까지 기존 미리보기가 그대로 보이고, 완료 순간 새 내용+스크롤 복원이 같은 프레임에 반영됨.
@@ -383,7 +431,7 @@ function runPaged(src,keepScroll,attempt){
   function swapIn(){pages.innerHTML="";while(staging.firstChild)pages.appendChild(staging.firstChild);dropStaging();}
   var prev=null;
   function release(){if(blobUrl){try{URL.revokeObjectURL(blobUrl);}catch(e){}blobUrl=null;}}   /* Paged.js 가 다 읽은 조판 CSS blob 해제(조판마다 남던 것) */
-  function fail(err){release();if(prev===shownPv)shownPv=null;dropPv(prev);if(myGen!==window.__pgGen){dropStaging();return;}if(err)console.error(err);dropStaging();pages.innerHTML="";fallbackRender(src);restore();pgSettle(myGen);}
+  function fail(err){release();if(prev===shownPv)shownPv=null;dropPv(prev);if(myGen!==window.__pgGen){dropStaging();return;}if(err)console.error(err);dropStaging();capture();var gone=shownPv;shownPv=null;dropPv(gone);pages.innerHTML="";fallbackRender(src);restore();pgSettle(myGen);}
   /* 콘텐츠 맨 앞에 <style> 태그를 붙이면 Paged.js 가 첫 페이지를 복제하는 버그가 있다(표지 없는 문서에서 발현).
      → PAGED_CSS 는 스타일시트(blobUrl)로만 넘기고, blob 생성 실패 시에만 인라인 <style> 폴백. */
   var content=blobUrl?src.innerHTML:("<style>"+pagedCss()+"</style>"+src.innerHTML);
@@ -397,7 +445,7 @@ function runPaged(src,keepScroll,attempt){
       var bad=false,pcs=staging.querySelectorAll(".pagedjs_page_content");
       for(var bi=0;bi<pcs.length;bi++){if(pageHasHiddenContent(pcs[bi])){bad=true;break;}}
       if(bad&&attempt<2){dropStaging();dropPv(prev);setTimeout(function(){if(myGen===window.__pgGen)runPaged(src,keepScroll,attempt+1);},50);return;}   /* 한 박자 쉬고 재조판(레이아웃 안정 후) */
-      swapIn();   /* 표 머리글 반복은 조판 중에 RepeatTableHeaders 핸들러가 이미 넣었다 */
+      capture();swapIn();   /* 표 머리글 반복은 조판 중에 RepeatTableHeaders 핸들러가 이미 넣었다 */
       var gone=shownPv;shownPv=prev;dropPv(gone);   /* 화면에서 내려간 지난 조판의 head <style> 정리 */
       if(typeof applyFooter==="function")applyFooter();
       if(typeof applyHeader==="function")applyHeader();
@@ -414,11 +462,18 @@ function runPaged(src,keepScroll,attempt){
 async function renderPreview(text,keepScroll){
 window.__lastText=text;
 var src=buildSource(text);
+/* 세대는 지금(그림을 읽기 전에) 잡는다 — 예전엔 runPaged 에서 잡아, 새 문서의 그림을 읽는 동안 끝난 이전 문서의 조판이
+   '최신'으로 통과해 새 탭 위에 'Total N pages' 로 올라왔다. 이제 그 사이 시작된 더 새 렌더만 이긴다. */
+var gen=(window.__pgGen=(window.__pgGen||0)+1);
 document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayoutPanes();
-if(!keepScroll)setHead("페이지 분할 중...");   /* 편집 재렌더 땐 기존 'Total N' 유지 → 헤더 깜빡임 방지(내용은 화면 밖에서 조판 후 교체) */
+if(!keepScroll){   /* 편집 재렌더 땐 기존 'Total N' 유지 → 헤더 깜빡임 방지(내용은 화면 밖에서 조판 후 교체) */
+  setHead("페이지 분할 중...");
+  try{showInterim(src);}catch(e){}   /* 다른 문서: 이전 문서 쪽을 바로 내리고 새 문서를 먼저 보여 준다 */
+}
 /* EXE(Neutralino)에서 로컬 이미지 경로(![](example.png))를 .md 폴더 기준으로 읽어 data URI로 치환. 브라우저에선 훅 없음. */
-if(typeof window.__resolveLocalImages==="function"){try{await window.__resolveLocalImages(src);}catch(e){}}
-return runPaged(src,keepScroll);   /* 조판이 끝나면 resolve */
+if(typeof window.__resolveLocalImages==="function"){try{await window.__resolveLocalImages(src,function(){return gen===window.__pgGen;});}catch(e){}}
+if(gen!==window.__pgGen)return pgUntil(gen);   /* 그림 읽는 사이 더 새 렌더가 시작됨 → 조판은 그쪽이 한다(그게 끝나면 함께 resolve) */
+return runPaged(src,keepScroll,0,gen);   /* 조판이 끝나면 resolve */
 }
 /* 파일 로드 등: 에디터(textarea+미러)에 내용을 채우고 미리보기도 처음부터 생성 */
 function renderMarkdown(text){
@@ -685,14 +740,18 @@ setIco();})();
   }
   function anchors(){var k=viewer.querySelectorAll("#pages [data-sl]").length+"|"+rawInput.scrollHeight+"|"+viewer.scrollHeight+"|"+rawInput.clientWidth+"|"+viewer.clientHeight;if(k!==ckey){cache=build();ckey=k;}return cache;}
   function interp(A,fk,tk,v){for(var i=0;i<A.length-1;i++){var a=A[i],b=A[i+1];if(v>=a[fk]&&v<=b[fk]){var s=b[fk]-a[fk];return a[tk]+(s>0?(v-a[fk])/s:0)*(b[tk]-a[tk]);}}return v<=A[0][fk]?A[0][tk]:A[A.length-1][tk];}
-  function linkFn(from,to,fk,tk){from.addEventListener("scroll",function(){if(clock()<lockUntil)return;if(document.body.classList.contains("editor-collapsed"))return;var A=anchors();if(!A||A.length<2)return;
+  function follow(from,to,fk,tk){if(document.body.classList.contains("editor-collapsed"))return;var A=anchors();if(!A||A.length<2)return;
     var q=from.scrollTop;
     var y=interp(A,fk,tk,q);if(y==null)return;
     lockUntil=clock()+80;to.scrollTop=Math.max(0,y);
     if(to===rawInput){mirror.scrollTop=rawInput.scrollTop;mirror.scrollLeft=rawInput.scrollLeft;}  /* 미리보기 스크롤로 편집기가 움직일 때 색상 미러도 즉시 맞춰 커서-글자 정합 유지 */
-  });}
+  }
+  function linkFn(from,to,fk,tk){from.addEventListener("scroll",function(){if(clock()<lockUntil)return;follow(from,to,fk,tk);});}
   linkFn(rawInput,viewer,"ed","vw");
   linkFn(viewer,rawInput,"vw","ed");
+  /* 탭 전환(tabs.js): 편집기 위치를 되돌린 직후 미리보기를 거기에 맞춘다. 새 문서를 먼저 보여 주며 미리보기를 맨 위로 올린 스크롤이
+     (이벤트 순서에 따라) 편집기를 거꾸로 맨 위로 끌어올리지 않게, 이벤트를 기다리지 않고 바로 맞추고 잠근다 */
+  window.__syncPreviewToEditor=function(){follow(rawInput,viewer,"ed","vw");};
 })();
 /* 원본 직접 편집: 입력 시 색상 미러 갱신 + 적응형 디바운스로 미리보기 재생성(뷰어 위치 보존).
    textarea 스크롤 시 뒤의 색상 미러를 같은 위치로 이동시켜 글자 정합 유지. */
@@ -880,9 +939,10 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
   function blobToDataUrl(b){return new Promise(function(r){var fr=new FileReader();fr.onload=function(){r(fr.result);};fr.readAsDataURL(b);});}
   async function readAsDataUrl(path){var arr=await Neutralino.filesystem.readBinaryFile(path);return blobToDataUrl(new Blob([new Uint8Array(arr)],{type:mimeOf(path)}));}
   /* 네이티브 이미지 해석기(버튼/더블클릭으로 연 경우=__mdDir 있음): 경로 1건을 .md 폴더 기준으로 읽어 WebP data URI 반환. 통합 해석기가 호출. */
-  window.__nativeResolve=async function(s){
-    if(!window.__mdDir)return null;
-    var abs=isAbs(s)?s.replace(/\//g,"\\"):joinP(window.__mdDir,s);
+  window.__nativeResolve=async function(s,dir){
+    if(dir===undefined)dir=window.__mdDir;   /* 통합 해석기는 렌더를 시작할 때의 문서 폴더를 넘긴다(읽는 사이 탭이 바뀌어도 그 문서 기준) */
+    if(!dir)return null;
+    var abs=isAbs(s)?s.replace(/\//g,"\\"):joinP(dir,s);
     try{var du=await readAsDataUrl(abs);return await window.__img.encode(du,mimeOf(abs));}catch(err){log("[img] resolve fail: "+abs);return null;}
   };
   async function openMd(path){
@@ -946,21 +1006,27 @@ ta.addEventListener("keyup",syncMirror);ta.addEventListener("click",syncMirror);
 })();
 /* ===== 통합 로컬 이미지 해석기 (브라우저·EXE 공통) =====
    각 <img> 로컬 경로를 (1) 드롭된 파일 맵(window.__drop) → (2) EXE 네이티브 FS(window.__nativeResolve) 순으로 해석. */
-window.__resolveLocalImages=async function(src){
+window.__resolveLocalImages=async function(src,isCurrent){
+  /* 이 문서의 이미지 풀·폴더를 지금 잡아 둔다 — 그림을 읽는(await) 사이 탭이 바뀌면 전역은 다른 문서 것이라,
+     예전엔 이전 문서 그림이 새 탭의 풀(같은 이름이면 그 문서 그림을 덮음)·목록에 섞이고 나머지 그림은 새 문서 폴더에서 찾았다 */
+  var drop=window.__drop||(window.__drop={}),dir=window.__mdDir;
   var imgs=src.querySelectorAll("img"),list=[],seen={},ref={};
   for(var i=0;i<imgs.length;i++){var el=imgs[i],raw0=el.getAttribute("src")||"";
     if(/^(https?:|data:|blob:)/i.test(raw0))continue;
     var s=raw0;try{s=decodeURIComponent(raw0);}catch(e){}   /* marked가 공백·한글을 %인코딩하므로 복원해 파일명과 매칭 */
-    var base=s.split(/[\\/]/).pop(),norm=s.replace(/^\.\//,"").replace(/\\/g,"/"),d=null;
-    if(window.__drop)d=window.__drop[norm]||window.__drop[base]||null;
-    if(!d&&typeof window.__nativeResolve==="function"){try{d=await window.__nativeResolve(s);}catch(e){}}
-    if(d){window.__drop=window.__drop||{};if(!window.__drop[base])window.__drop[base]=d;}   /* 해석된 이미지를 풀에 보관 → 목록에 삭제 버튼 표시 + 문서 전환에도 유지 */
+    var base=s.split(/[\\/]/).pop(),norm=s.replace(/^\.\//,"").replace(/\\/g,"/"),d=poolHit(drop,raw0);
+    if(!d&&typeof window.__nativeResolve==="function"){
+      if(isCurrent&&!isCurrent())return;   /* 더 새 렌더가 시작됨(다른 탭일 수도) → 그만 읽는다. 남은 그림은 그 문서를 다시 볼 때 읽는다 */
+      try{d=await window.__nativeResolve(s,dir);}catch(e){}
+    }
+    if(d&&!drop[base])drop[base]=d;   /* 해석된 이미지를 풀에 보관 → 목록에 삭제 버튼 표시 + 문서 전환에도 유지 */
     if(d)el.setAttribute("src",d);
     ref[base]=1;ref[norm]=1;
     if(!seen[base]){seen[base]=1;list.push({name:base,status:d?"ok":"missing"});}
   }
   /* 드롭했지만 문서에서 참조하지 않은 이미지 표시 */
-  if(window.__drop){for(var k in window.__drop){if(window.__drop.hasOwnProperty(k)&&!ref[k]&&!seen[k]){seen[k]=1;list.push({name:k,status:"unused"});}}}
+  for(var k in drop){if(drop.hasOwnProperty(k)&&!ref[k]&&!seen[k]){seen[k]=1;list.push({name:k,status:"unused"});}}
+  if(isCurrent&&!isCurrent())return;   /* 그새 다른 렌더로 넘어감 → 목록·배지는 그쪽이 갱신(이전 문서 목록이 새 탭 배지에 뜨지 않게) */
   window.__imgFiles=list;
   if(typeof window.__renderFileBadge==="function")window.__renderFileBadge();
 };

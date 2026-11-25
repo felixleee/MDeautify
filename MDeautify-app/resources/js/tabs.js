@@ -92,8 +92,9 @@
     if(window.__setSaved)window.__setSaved(s.baseline);
     document.body.classList.add("loaded");if(window.__relayoutPanes)window.__relayoutPanes();
     if(m&&typeof hlMd==="function")m.innerHTML=hlMd(s.text);
+    if(t){t.scrollTop=s.scroll||0;if(m){m.scrollTop=t.scrollTop;m.scrollLeft=t.scrollLeft;}}   /* 편집기 위치 먼저 — 미리보기가 그 위치부터 먼저 보여 준다 */
     if(typeof renderPreview==="function")renderPreview(s.text,false);
-    if(t){t.scrollTop=s.scroll||0;if(m){m.scrollTop=t.scrollTop;m.scrollLeft=t.scrollLeft;}}
+    if(window.__syncPreviewToEditor)window.__syncPreviewToEditor();   /* 먼저 보여 준 부분을 편집기 위치에 맞추고, 미리보기를 맨 위로 올린 스크롤이 편집기를 끌어올리지 않게 잠근다 */
     var fh=document.getElementById("findHl");if(fh)fh.innerHTML="";   /* 이전 탭의 찾기 하이라이트 잔상 제거 */
     if(window.__findRefresh)window.__findRefresh();   /* 열린 찾기 바의 결과를 이 문서 기준으로(이전 문서 오프셋으로 '모두 변경'하지 않게) */
     if(window.__renderFileBadge)window.__renderFileBadge();
@@ -138,6 +139,7 @@
 
   function clearToEmpty(){
     if(window.__cancelEdit)window.__cancelEdit();   /* 대기 중 입력 타이머가 빈 화면을 'loaded' 로 되살리지 않게 */
+    if(window.__cancelPreview)window.__cancelPreview();   /* 진행 중인 조판이 끝나 닫은 문서의 쪽을 되살리지 않게 */
     if(window.__findClose)window.__findClose();
     activeId=null;
     document.body.classList.remove("loaded");
